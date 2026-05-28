@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Mini game nội bộ CLB — ai có link đều đọc/ghi được.
+    // Nếu cần bảo mật hơn, bật Firebase Authentication và giới hạn quyền.
+    match /events/{eventId} {
+      allow read, write: if true;
+    }
+  }
+}
