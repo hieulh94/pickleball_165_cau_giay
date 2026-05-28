@@ -13,6 +13,7 @@ export interface Pair {
   player2Id: string
   group?: string
   locked?: boolean
+  isManual?: boolean
 }
 
 export interface Match {

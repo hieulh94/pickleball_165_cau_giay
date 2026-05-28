@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import { ResultDialog } from '../components/ResultDialog'
 import { getPairLabel, randomPairs } from '../lib/pairing'
+import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { generateSchedule } from '../lib/schedule'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { subscribeEvent, upsertEvent } from '../lib/storage'
@@ -15,7 +17,79 @@ import {
   type SectionKey,
 } from '../components/CollapsibleSection'
 import { StandingsContent } from '../components/StandingsSection'
-import type { Match, Participant, PickleballEvent, SkillLevel } from '../types'
+import type { Match, Pair, Participant, PickleballEvent, SkillLevel } from '../types'
+
+function isManualPair(pair: Pair) {
+  return pair.isManual === true || (pair.isManual === undefined && pair.locked === true)
+}
+
+function PairTypeBadge({ pair }: { pair: Pair }) {
+  if (isManualPair(pair)) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+        ✋ Ghép tay
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+      🎲 Random
+    </span>
+  )
+}
+
+function getPairNameLines(pair: Pair, participants: Participant[]) {
+  const p1 = participants.find((p) => p.id === pair.player1Id)
+  const p2 = participants.find((p) => p.id === pair.player2Id)
+  if (!p1 || !p2) return { line1: '—', line2: '' }
+  return { line1: p1.name, line2: p2.name }
+}
+
+function getPairShortLabel(pair: Pair, participants: Participant[]) {
+  const p1 = participants.find((p) => p.id === pair.player1Id)
+  const p2 = participants.find((p) => p.id === pair.player2Id)
+  if (!p1 || !p2) return '—'
+  return `${p1.name} & ${p2.name}`
+}
+
+function PairDisplayCard({
+  pair,
+  pairNumber,
+  participants,
+}: {
+  pair: Pair | undefined
+  pairNumber: number
+  participants: Participant[]
+}) {
+  if (!pair || pairNumber < 1) {
+    return (
+      <div className="flex h-full min-h-[5.5rem] w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+        —
+      </div>
+    )
+  }
+
+  const color = getPairColor(pairNumber)
+  const { line1, line2 } = getPairNameLines(pair, participants)
+
+  return (
+    <div
+      className={`flex h-full min-h-[5.5rem] w-full flex-col items-center justify-center border-2 text-center ${color.border} ${color.bg} rounded-xl px-2 py-3 shadow-sm`}
+    >
+      <p className={`text-sm font-bold ${color.text}`}>Cặp {pairNumber}</p>
+      <p className={`mt-1 w-full break-words text-xs font-semibold leading-tight ${color.text}`}>
+        {line1}
+      </p>
+      <p className={`text-[10px] font-medium ${color.text} opacity-70`}>&</p>
+      <p className={`w-full break-words text-xs font-semibold leading-tight ${color.text}`}>
+        {line2}
+      </p>
+      <div className="mt-2">
+        <PairTypeBadge pair={pair} />
+      </div>
+    </div>
+  )
+}
 
 export function EventPage() {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +104,11 @@ export function EventPage() {
   const [isEditingEventName, setIsEditingEventName] = useState(false)
   const [eventNameInput, setEventNameInput] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+  const [participantToDelete, setParticipantToDelete] = useState<string | null>(null)
+  const [showRandomPairsConfirm, setShowRandomPairsConfirm] = useState(false)
+  const [randomWheelLabels, setRandomWheelLabels] = useState<string[] | null>(null)
+  const pendingRandomApplyRef = useRef<(() => void) | null>(null)
+  const [showCreateScheduleConfirm, setShowCreateScheduleConfirm] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [sectionVisibility, setSectionVisibility] = useState(DEFAULT_SECTION_VISIBILITY)
 
@@ -70,6 +149,12 @@ export function EventPage() {
 
     return unsubscribe
   }, [id])
+
+  const finishRandomWheel = useCallback(() => {
+    setRandomWheelLabels(null)
+    pendingRandomApplyRef.current?.()
+    pendingRandomApplyRef.current = null
+  }, [])
 
   const persist = async (updated: PickleballEvent) => {
     try {
@@ -113,6 +198,28 @@ export function EventPage() {
     if (!event) return []
     const usedIds = new Set(event.pairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
     return event.participants.filter((participant) => !usedIds.has(participant.id))
+  }, [event])
+
+  const manualEntryOrderById = useMemo(() => {
+    if (!event) return new Map<string, number>()
+    const order = new Map<string, number>()
+    let pairIndex = 0
+    for (const pair of event.pairs) {
+      if (!isManualPair(pair)) continue
+      pairIndex += 1
+      order.set(pair.player1Id, pairIndex)
+      order.set(pair.player2Id, pairIndex)
+    }
+    return order
+  }, [event])
+
+  const pairNumberById = useMemo(() => {
+    if (!event) return new Map<string, number>()
+    const numbers = new Map<string, number>()
+    event.pairs.forEach((pair, index) => {
+      numbers.set(pair.id, index + 1)
+    })
+    return numbers
   }, [event])
 
   const normalizeParticipantName = (value: string) =>
@@ -210,17 +317,48 @@ export function EventPage() {
     setName('')
   }
 
-  const removeParticipant = (participantId: string) => {
-    persist({
-      ...event,
-      participants: event.participants.filter((p) => p.id !== participantId),
-      pairs: [],
-      matches: [],
-    })
+  const doRemoveParticipant = () => {
+    if (!participantToDelete) return
+
+    const manualPair = event.pairs.find(
+      (pair) =>
+        isManualPair(pair) &&
+        (pair.player1Id === participantToDelete || pair.player2Id === participantToDelete),
+    )
+
+    if (manualPair) {
+      const partnerId =
+        manualPair.player1Id === participantToDelete
+          ? manualPair.player2Id
+          : manualPair.player1Id
+      const partner = event.participants.find((p) => p.id === partnerId)
+      const idsToRemove = new Set([participantToDelete])
+      if (partner?.isManualEntry) {
+        idsToRemove.add(partnerId)
+      }
+
+      persist({
+        ...event,
+        participants: event.participants.filter((p) => !idsToRemove.has(p.id)),
+        pairs: event.pairs.filter((p) => p.id !== manualPair.id),
+        matches: event.matches.filter(
+          (m) => m.pair1Id !== manualPair.id && m.pair2Id !== manualPair.id,
+        ),
+      })
+    } else {
+      persist({
+        ...event,
+        participants: event.participants.filter((p) => p.id !== participantToDelete),
+        pairs: [],
+        matches: [],
+      })
+    }
+
+    setParticipantToDelete(null)
   }
 
-  const handleRandomPairs = () => {
-    const lockedPairs = event.pairs.filter((pair) => pair.locked)
+  const doRandomPairs = () => {
+    const lockedPairs = event.pairs.filter((pair) => isManualPair(pair))
     const lockedIds = new Set(lockedPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
     const remainingParticipants = event.participants.filter((p) => !lockedIds.has(p.id))
 
@@ -243,11 +381,38 @@ export function EventPage() {
       generatedPairs = result.pairs.map((pair) => ({ ...pair, locked: false }))
     }
 
-    persist({
-      ...event,
-      pairs: applyGroups([...lockedPairs, ...generatedPairs], event.splitGroups),
-      matches: [],
-    })
+    const wheelNames =
+      remainingParticipants.length > 0
+        ? remainingParticipants.map((p) => p.name)
+        : event.participants.map((p) => p.name)
+
+    pendingRandomApplyRef.current = () => {
+      persist({
+        ...event,
+        pairs: applyGroups([...lockedPairs, ...generatedPairs], event.splitGroups),
+        matches: [],
+      })
+    }
+
+    setShowRandomPairsConfirm(false)
+    setRandomWheelLabels(wheelNames)
+  }
+
+  const requestRandomPairs = () => {
+    const lockedPairs = event.pairs.filter((pair) => isManualPair(pair))
+    const lockedIds = new Set(lockedPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
+    const remainingParticipants = event.participants.filter((p) => !lockedIds.has(p.id))
+
+    if (lockedPairs.length === 0 && event.participants.length < 2) {
+      alert('Cần ít nhất 2 người tham gia để random cặp đôi.')
+      return
+    }
+    if (remainingParticipants.length > 0 && remainingParticipants.length % 2 !== 0) {
+      alert('Số người còn lại phải là số chẵn để ghép cặp đôi.')
+      return
+    }
+
+    setShowRandomPairsConfirm(true)
   }
 
   const handleAddManualPair = () => {
@@ -308,6 +473,7 @@ export function EventPage() {
           player2Id: participant2.id,
           group,
           locked: true,
+          isManual: true,
         },
       ],
       matches: [],
@@ -332,14 +498,27 @@ export function EventPage() {
       return
     }
 
-    doGenerateSchedule()
+    setShowCreateScheduleConfirm(true)
   }
 
   const doGenerateSchedule = () => {
     const matches = generateSchedule(event.pairs, event.courts)
     persist({ ...event, matches })
     setShowRegenerateConfirm(false)
+    setShowCreateScheduleConfirm(false)
   }
+
+  const participantPendingDelete = participantToDelete
+    ? event.participants.find((p) => p.id === participantToDelete)
+    : null
+
+  const manualPairPendingDelete =
+    participantToDelete &&
+    event.pairs.find(
+      (pair) =>
+        isManualPair(pair) &&
+        (pair.player1Id === participantToDelete || pair.player2Id === participantToDelete),
+    )
 
   const addCourt = () => {
     const num = parseInt(courtInput, 10)
@@ -499,15 +678,19 @@ export function EventPage() {
               >
                 <span className="text-sm">
                   <span className="font-medium text-slate-900">{p.name}</span>
-                  {!p.isManualEntry && (
-                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                  {p.isManualEntry && manualEntryOrderById.has(p.id) ? (
+                    <span className="ml-2 rounded-full border border-violet-400 bg-violet-200 px-2 py-0.5 text-xs font-bold text-violet-900">
+                      Trình tự chọn {manualEntryOrderById.get(p.id)}
+                    </span>
+                  ) : !p.isManualEntry ? (
+                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                       Trình độ {p.skillLevel}
                     </span>
-                  )}
+                  ) : null}
                 </span>
                 <button
                   type="button"
-                  onClick={() => removeParticipant(p.id)}
+                  onClick={() => setParticipantToDelete(p.id)}
                   className="text-xs text-red-500 hover:text-red-700"
                 >
                   Xóa
@@ -528,14 +711,14 @@ export function EventPage() {
       >
         <button
           type="button"
-          onClick={handleRandomPairs}
-          className="rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-amber-600"
+          onClick={requestRandomPairs}
+          className="rounded-lg border-2 border-amber-600 bg-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-amber-600"
         >
           🎲 Random cặp đôi
         </button>
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-medium text-slate-800">Hoặc ghép tay cặp đôi</p>
+        <div className="mt-4 rounded-xl border-2 border-violet-300 bg-violet-50 p-4">
+          <p className="text-sm font-bold text-violet-900">✋ Hoặc ghép tay cặp đôi</p>
           <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
             <input
               type="text"
@@ -556,7 +739,7 @@ export function EventPage() {
               type="button"
               onClick={handleAddManualPair}
               disabled={!canAddManualPair}
-              className="rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border-2 border-violet-500 bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-500"
             >
               + Thêm cặp
             </button>
@@ -568,26 +751,43 @@ export function EventPage() {
         </div>
 
         {event.pairs.length > 0 && (
-          <div className="mt-6 space-y-4">
+          <div className="mt-4 flex flex-wrap gap-2">
+            {event.pairs.map((pair) => {
+              const pairNumber = pairNumberById.get(pair.id) ?? 0
+              const color = getPairColor(pairNumber)
+              return (
+                <span
+                  key={pair.id}
+                  className={`inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-xs font-bold ${color.border} ${color.bg} ${color.text}`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full border ${color.swatch}`} />
+                  Cặp {pairNumber}
+                </span>
+              )
+            })}
+          </div>
+        )}
+
+        {event.pairs.length > 0 && (
+          <div className="mt-4 space-y-4">
             {pairsByGroup.map(([group, pairs]) => (
               <div key={group}>
                 {event.splitGroups && (
                   <h4 className="mb-2 text-sm font-semibold text-green-700">{group}</h4>
                 )}
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {pairs.map((pair, idx) => (
-                    <div
-                      key={pair.id}
-                      className="rounded-xl bg-green-50 px-4 py-3 text-sm font-medium text-green-900"
-                    >
-                      Cặp {idx + 1}: {getPairLabel(pair, event.participants)}
-                      {pair.locked && (
-                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                          Khóa
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pairs.map((pair) => {
+                    const pairNumber = pairNumberById.get(pair.id) ?? 0
+                    return (
+                      <div key={pair.id} className={pairCardClassName(pairNumber)}>
+                        <p className="font-bold">Cặp {pairNumber}</p>
+                        <p className="mt-0.5 text-sm leading-snug">
+                          {getPairShortLabel(pair, event.participants)}
+                          <PairTypeBadge pair={pair} />
+                        </p>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}
@@ -659,77 +859,102 @@ export function EventPage() {
         )}
 
         {event.matches.length > 0 && (
-          <div className="mt-8 space-y-6">
-            {matchesByRound.map(([round, matches]) => (
-              <div key={round}>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Vòng {round}
-                </h4>
-                <div className="grid gap-3">
-                  {matches
-                    .sort((a, b) => a.court - b.court)
-                    .map((match) => {
-                      const pair1 = event.pairs.find((p) => p.id === match.pair1Id)
-                      const pair2 = event.pairs.find((p) => p.id === match.pair2Id)
-                      const label1 = pair1
-                        ? getPairLabel(pair1, event.participants)
-                        : '—'
-                      const label2 = pair2
-                        ? getPairLabel(pair2, event.participants)
-                        : '—'
+          <>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {event.pairs.map((pair) => {
+                const pairNumber = pairNumberById.get(pair.id) ?? 0
+                const color = getPairColor(pairNumber)
+                return (
+                  <span
+                    key={pair.id}
+                    className={`inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-xs font-bold ${color.border} ${color.bg} ${color.text}`}
+                  >
+                    <span className={`h-2.5 w-2.5 rounded-full border ${color.swatch}`} />
+                    Cặp {pairNumber}
+                  </span>
+                )
+              })}
+            </div>
 
-                      return (
-                        <div
-                          key={match.id}
-                          className={`rounded-xl border p-4 ${
-                            match.completed
-                              ? 'border-green-200 bg-green-50/50'
-                              : 'border-slate-200 bg-white'
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                <span className="rounded bg-slate-100 px-2 py-0.5 font-medium">
-                                  Sân {match.court}
+            <div className="mt-5 space-y-8">
+              {matchesByRound.map(([round, matches]) => (
+                <div key={round}>
+                  <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                    Vòng {round}
+                  </h4>
+                  <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+                    {matches
+                      .sort((a, b) => a.court - b.court)
+                      .map((match) => {
+                        const pair1 = event.pairs.find((p) => p.id === match.pair1Id)
+                        const pair2 = event.pairs.find((p) => p.id === match.pair2Id)
+                        const pair1Number = pairNumberById.get(match.pair1Id) ?? 0
+                        const pair2Number = pairNumberById.get(match.pair2Id) ?? 0
+
+                        return (
+                          <div
+                            key={match.id}
+                            className={`flex h-full flex-col rounded-2xl border p-4 shadow-sm ${
+                              match.completed
+                                ? 'border-green-400 bg-green-50'
+                                : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                              <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
+                                Sân {match.court}
+                              </span>
+                              {match.group && (
+                                <span className="rounded-lg bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                                  {match.group}
                                 </span>
-                                {match.group && (
-                                  <span className="rounded bg-green-100 px-2 py-0.5 font-medium text-green-700">
-                                    {match.group}
-                                  </span>
-                                )}
-                                {match.completed && (
-                                  <span className="rounded bg-green-600 px-2 py-0.5 font-medium text-white">
-                                    Hoàn thành
-                                  </span>
-                                )}
-                              </div>
-                              <div className="mt-2 text-sm">
-                                <p className="font-medium text-slate-900">{label1}</p>
-                                <p className="my-1 text-xs text-slate-400">vs</p>
-                                <p className="font-medium text-slate-900">{label2}</p>
-                              </div>
+                              )}
                               {match.completed && (
-                                <p className="mt-2 text-lg font-bold text-green-600">
-                                  {match.score1} - {match.score2}
-                                </p>
+                                <span className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-semibold text-white">
+                                  Hoàn thành
+                                </span>
                               )}
                             </div>
+
+                            <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-stretch gap-2">
+                              <PairDisplayCard
+                                pair={pair1}
+                                pairNumber={pair1Number}
+                                participants={event.participants}
+                              />
+                              <div className="flex items-center justify-center">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700">
+                                  VS
+                                </span>
+                              </div>
+                              <PairDisplayCard
+                                pair={pair2}
+                                pairNumber={pair2Number}
+                                participants={event.participants}
+                              />
+                            </div>
+
+                            {match.completed && (
+                              <p className="my-4 text-center text-2xl font-bold text-green-600">
+                                {match.score1} – {match.score2}
+                              </p>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => setSelectedMatch(match)}
-                              className="shrink-0 rounded-lg border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
+                              className="mt-4 w-full rounded-lg border border-green-400 bg-green-50 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-100"
                             >
                               {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
                             </button>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </CollapsibleSection>
 
@@ -777,6 +1002,47 @@ export function EventPage() {
         onSubmit={(s1, s2) => {
           if (selectedMatch) handleUpdateResult(selectedMatch.id, s1, s2)
         }}
+      />
+
+      <ConfirmDialog
+        open={!!participantToDelete}
+        title="Xóa người tham gia"
+        message={
+          manualPairPendingDelete
+            ? `Bạn có chắc muốn xóa "${participantPendingDelete?.name ?? ''}"? Cặp ghép tay chứa người này sẽ bị xóa. Các cặp và lịch khác được giữ nguyên.`
+            : `Bạn có chắc muốn xóa "${participantPendingDelete?.name ?? ''}"? Toàn bộ cặp đôi và lịch thi đấu hiện tại sẽ bị xóa.`
+        }
+        confirmLabel="Xóa"
+        onConfirm={doRemoveParticipant}
+        onCancel={() => setParticipantToDelete(null)}
+      />
+
+      <RandomPairWheelOverlay
+        open={randomWheelLabels !== null}
+        labels={randomWheelLabels ?? []}
+        onComplete={finishRandomWheel}
+      />
+
+      <ConfirmDialog
+        open={showRandomPairsConfirm}
+        title="Random cặp đôi"
+        message={
+          event.pairs.some((pair) => isManualPair(pair))
+            ? 'Các cặp ghép tay (✋) sẽ được giữ nguyên. Cặp còn lại sẽ được random lại và lịch thi đấu sẽ bị xóa.'
+            : 'Danh sách cặp đôi hiện tại sẽ bị thay thế và lịch thi đấu sẽ bị xóa.'
+        }
+        confirmLabel="Random"
+        onConfirm={doRandomPairs}
+        onCancel={() => setShowRandomPairsConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={showCreateScheduleConfirm}
+        title="Tạo lịch thi đấu"
+        message="Hệ thống sẽ tạo lịch thi đấu vòng bảng từ danh sách cặp đôi hiện tại."
+        confirmLabel="Tạo lịch"
+        onConfirm={doGenerateSchedule}
+        onCancel={() => setShowCreateScheduleConfirm(false)}
       />
 
       <ConfirmDialog
