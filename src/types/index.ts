@@ -28,6 +28,8 @@ export interface Match {
 export interface PickleballEvent {
   id: string
   name: string
+  accessCode: string
+  accessPassword: string
   createdAt: string
   participants: Participant[]
   pairs: Pair[]

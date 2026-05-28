@@ -12,13 +12,24 @@ import { getDb } from './firebase'
 const EVENTS_COLLECTION = 'events'
 
 function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
-  const event = raw as unknown as PickleballEvent & { courtCount?: number }
+  const event = raw as unknown as PickleballEvent & {
+    courtCount?: number
+    accessCode?: string
+    accessPassword?: string
+  }
 
   if (!event.courts && typeof event.courtCount === 'number') {
     event.courts = Array.from({ length: event.courtCount }, (_, i) => i + 1)
   }
   if (!event.courts) {
     event.courts = []
+  }
+  if (typeof event.accessCode !== 'string') {
+    event.accessCode = ''
+  }
+  event.accessCode = event.accessCode.trim().toUpperCase()
+  if (typeof event.accessPassword !== 'string') {
+    event.accessPassword = ''
   }
 
   return event

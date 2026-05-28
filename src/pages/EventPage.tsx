@@ -265,6 +265,9 @@ export function EventPage() {
 
       <div className="mt-4">
         <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
+        </p>
       </div>
 
       <SectionToggleBar
