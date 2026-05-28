@@ -27,6 +27,8 @@ export function EventPage() {
   const [courtInput, setCourtInput] = useState('')
   const [manualPlayer1Name, setManualPlayer1Name] = useState('')
   const [manualPlayer2Name, setManualPlayer2Name] = useState('')
+  const [isEditingEventName, setIsEditingEventName] = useState(false)
+  const [eventNameInput, setEventNameInput] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [sectionVisibility, setSectionVisibility] = useState(DEFAULT_SECTION_VISIBILITY)
@@ -137,6 +139,17 @@ export function EventPage() {
     return participant1.id !== participant2.id
   }, [event, manualPlayer1Name, manualPlayer2Name])
 
+  const applyGroups = (pairs: PickleballEvent['pairs'], splitGroups: boolean) => {
+    const cleanPairs = pairs.map((pair) => ({ ...pair, group: undefined }))
+    if (!splitGroups || cleanPairs.length < 2) return cleanPairs
+
+    const groupCount = Math.min(4, Math.max(2, Math.ceil(cleanPairs.length / 3)))
+    return cleanPairs.map((pair, index) => ({
+      ...pair,
+      group: `Bảng ${String.fromCharCode(65 + (index % groupCount))}`,
+    }))
+  }
+
   if (!isFirebaseConfigured()) {
     return (
       <div>
@@ -207,22 +220,34 @@ export function EventPage() {
   }
 
   const handleRandomPairs = () => {
-    if (event.participants.length < 2) {
+    const lockedPairs = event.pairs.filter((pair) => pair.locked)
+    const lockedIds = new Set(lockedPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
+    const remainingParticipants = event.participants.filter((p) => !lockedIds.has(p.id))
+
+    if (lockedPairs.length === 0 && event.participants.length < 2) {
       alert('Cần ít nhất 2 người tham gia để random cặp đôi.')
       return
     }
-    if (event.participants.length % 2 !== 0) {
-      alert('Số người tham gia phải là số chẵn để ghép cặp đôi.')
+    if (remainingParticipants.length > 0 && remainingParticipants.length % 2 !== 0) {
+      alert('Số người còn lại phải là số chẵn để ghép cặp đôi.')
       return
     }
 
-    const result = randomPairs(event.participants, event.splitGroups)
-    if ('error' in result) {
-      alert(result.error)
-      return
+    let generatedPairs: PickleballEvent['pairs'] = []
+    if (remainingParticipants.length > 0) {
+      const result = randomPairs(remainingParticipants, event.splitGroups)
+      if ('error' in result) {
+        alert(result.error)
+        return
+      }
+      generatedPairs = result.pairs.map((pair) => ({ ...pair, locked: false }))
     }
 
-    persist({ ...event, pairs: result.pairs, matches: [] })
+    persist({
+      ...event,
+      pairs: applyGroups([...lockedPairs, ...generatedPairs], event.splitGroups),
+      matches: [],
+    })
   }
 
   const handleAddManualPair = () => {
@@ -249,6 +274,7 @@ export function EventPage() {
         id: crypto.randomUUID(),
         name: rawName.trim().replace(/\s+/g, ' '),
         skillLevel: 1,
+        isManualEntry: true,
       }
       allParticipants.push(created)
       return created
@@ -281,6 +307,7 @@ export function EventPage() {
           player1Id: participant1.id,
           player2Id: participant2.id,
           group,
+          locked: true,
         },
       ],
       matches: [],
@@ -348,6 +375,21 @@ export function EventPage() {
     })
   }
 
+  const handleStartEditEventName = () => {
+    setEventNameInput(event.name)
+    setIsEditingEventName(true)
+  }
+
+  const handleSaveEventName = () => {
+    const trimmed = eventNameInput.trim()
+    if (!trimmed) {
+      alert('Tên event không được để trống.')
+      return
+    }
+    persist({ ...event, name: trimmed })
+    setIsEditingEventName(false)
+  }
+
   const availableSections: SectionKey[] =
     event.matches.length > 0
       ? ['participants', 'pairs', 'schedule', 'standings']
@@ -360,7 +402,48 @@ export function EventPage() {
       </Link>
 
       <div className="mt-4">
-        <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
+        {isEditingEventName ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="text"
+              value={eventNameInput}
+              onChange={(e) => setEventNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveEventName()}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:max-w-md"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleSaveEventName}
+                className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+              >
+                Lưu
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingEventName(false)
+                  setEventNameInput('')
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
+            <button
+              type="button"
+              onClick={handleStartEditEventName}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Sửa tên
+            </button>
+          </div>
+        )}
         <p className="mt-1 text-sm text-slate-500">
           Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
         </p>
@@ -416,9 +499,11 @@ export function EventPage() {
               >
                 <span className="text-sm">
                   <span className="font-medium text-slate-900">{p.name}</span>
-                  <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                    Trình độ {p.skillLevel}
-                  </span>
+                  {!p.isManualEntry && (
+                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                      Trình độ {p.skillLevel}
+                    </span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -440,19 +525,6 @@ export function EventPage() {
         description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
         onToggle={() => toggleSection('pairs')}
-        headerExtra={
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={event.splitGroups}
-              onChange={(e) =>
-                persist({ ...event, splitGroups: e.target.checked, pairs: [], matches: [] })
-              }
-              className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-            />
-            <span className="text-sm font-medium text-slate-700">Chia bảng đấu</span>
-          </label>
-        }
       >
         <button
           type="button"
@@ -509,6 +581,11 @@ export function EventPage() {
                       className="rounded-xl bg-green-50 px-4 py-3 text-sm font-medium text-green-900"
                     >
                       Cặp {idx + 1}: {getPairLabel(pair, event.participants)}
+                      {pair.locked && (
+                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                          Khóa
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

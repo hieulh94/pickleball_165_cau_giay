@@ -4,6 +4,7 @@ export interface Participant {
   id: string
   name: string
   skillLevel: SkillLevel
+  isManualEntry?: boolean
 }
 
 export interface Pair {
@@ -11,6 +12,7 @@ export interface Pair {
   player1Id: string
   player2Id: string
   group?: string
+  locked?: boolean
 }
 
 export interface Match {
