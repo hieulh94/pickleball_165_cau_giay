@@ -25,6 +25,8 @@ export function EventPage() {
   const [name, setName] = useState('')
   const [skillLevel, setSkillLevel] = useState<SkillLevel>(1)
   const [courtInput, setCourtInput] = useState('')
+  const [manualPlayer1Name, setManualPlayer1Name] = useState('')
+  const [manualPlayer2Name, setManualPlayer2Name] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [sectionVisibility, setSectionVisibility] = useState(DEFAULT_SECTION_VISIBILITY)
@@ -104,6 +106,36 @@ export function EventPage() {
     if (!event) return []
     return calculateStandings(event.pairs, event.matches, event.splitGroups)
   }, [event])
+
+  const unpairedParticipants = useMemo(() => {
+    if (!event) return []
+    const usedIds = new Set(event.pairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
+    return event.participants.filter((participant) => !usedIds.has(participant.id))
+  }, [event])
+
+  const normalizeParticipantName = (value: string) =>
+    value.trim().replace(/\s+/g, ' ').toLowerCase()
+
+  const canAddManualPair = useMemo(() => {
+    if (!event) return false
+
+    const player1Name = normalizeParticipantName(manualPlayer1Name)
+    const player2Name = normalizeParticipantName(manualPlayer2Name)
+    if (!player1Name || !player2Name || player1Name === player2Name) return false
+
+    const participant1 = event.participants.find(
+      (participant) => normalizeParticipantName(participant.name) === player1Name,
+    )
+    const participant2 = event.participants.find(
+      (participant) => normalizeParticipantName(participant.name) === player2Name,
+    )
+    if (!participant1 || !participant2) return true
+
+    const usedIds = new Set(event.pairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
+    if (usedIds.has(participant1.id) || usedIds.has(participant2.id)) return false
+
+    return participant1.id !== participant2.id
+  }, [event, manualPlayer1Name, manualPlayer2Name])
 
   if (!isFirebaseConfigured()) {
     return (
@@ -191,6 +223,70 @@ export function EventPage() {
     }
 
     persist({ ...event, pairs: result.pairs, matches: [] })
+  }
+
+  const handleAddManualPair = () => {
+    const player1Name = normalizeParticipantName(manualPlayer1Name)
+    const player2Name = normalizeParticipantName(manualPlayer2Name)
+
+    if (!player1Name || !player2Name) {
+      alert('Hãy nhập đủ tên 2 người chơi để tạo cặp.')
+      return
+    }
+    if (player1Name === player2Name) {
+      alert('Hai người trong một cặp phải khác nhau.')
+      return
+    }
+
+    const allParticipants = [...event.participants]
+    const findOrCreateParticipant = (normalizedName: string, rawName: string) => {
+      const existed = allParticipants.find(
+        (participant) => normalizeParticipantName(participant.name) === normalizedName,
+      )
+      if (existed) return existed
+
+      const created: Participant = {
+        id: crypto.randomUUID(),
+        name: rawName.trim().replace(/\s+/g, ' '),
+        skillLevel: 1,
+      }
+      allParticipants.push(created)
+      return created
+    }
+
+    const participant1 = findOrCreateParticipant(player1Name, manualPlayer1Name)
+    const participant2 = findOrCreateParticipant(player2Name, manualPlayer2Name)
+
+    const usedIds = new Set(event.pairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
+    if (usedIds.has(participant1.id) || usedIds.has(participant2.id)) {
+      alert('Một trong hai người chơi đã có cặp. Vui lòng nhập người khác.')
+      return
+    }
+
+    let group: string | undefined
+    if (event.splitGroups && event.pairs.length >= 2) {
+      const nextPairsLength = event.pairs.length + 1
+      const groupCount = Math.min(4, Math.max(2, Math.ceil(nextPairsLength / 3)))
+      const groupIndex = event.pairs.length % groupCount
+      group = `Bảng ${String.fromCharCode(65 + groupIndex)}`
+    }
+
+    persist({
+      ...event,
+      participants: allParticipants,
+      pairs: [
+        ...event.pairs,
+        {
+          id: crypto.randomUUID(),
+          player1Id: participant1.id,
+          player2Id: participant2.id,
+          group,
+        },
+      ],
+      matches: [],
+    })
+    setManualPlayer1Name('')
+    setManualPlayer2Name('')
   }
 
   const handleGenerateSchedule = () => {
@@ -365,6 +461,39 @@ export function EventPage() {
         >
           🎲 Random cặp đôi
         </button>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-medium text-slate-800">Hoặc ghép tay cặp đôi</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+            <input
+              type="text"
+              value={manualPlayer1Name}
+              onChange={(e) => setManualPlayer1Name(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              placeholder="Nhập tên người chơi 1"
+            />
+            <input
+              type="text"
+              value={manualPlayer2Name}
+              onChange={(e) => setManualPlayer2Name(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddManualPair()}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              placeholder="Nhập tên người chơi 2"
+            />
+            <button
+              type="button"
+              onClick={handleAddManualPair}
+              disabled={!canAddManualPair}
+              className="rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Thêm cặp
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Còn {unpairedParticipants.length} người chưa ghép cặp. Có thể nhập tên mới, hệ thống sẽ
+            tự thêm người chơi vào danh sách.
+          </p>
+        </div>
 
         {event.pairs.length > 0 && (
           <div className="mt-6 space-y-4">

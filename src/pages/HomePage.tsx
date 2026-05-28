@@ -193,7 +193,7 @@ export function HomePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Danh sách Event</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -203,7 +203,7 @@ export function HomePage() {
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700"
+          className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700 sm:w-auto"
         >
           + Tạo Event
         </button>
@@ -220,19 +220,19 @@ export function HomePage() {
         <p className="mt-1 text-sm text-slate-500">
           Nhập mã event do ban tổ chức cung cấp để mở trang event.
         </p>
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <input
             type="text"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && handleJoinByCode()}
             placeholder="Ví dụ: THU7-CAU1"
-            className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase tracking-wide focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase tracking-wide focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:flex-1"
           />
           <button
             type="button"
             onClick={handleJoinByCode}
-            className="rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
+            className="w-full rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 sm:w-auto"
           >
             Vào xem
           </button>
@@ -261,12 +261,12 @@ export function HomePage() {
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
           </div>
-          <div className="mt-3 flex gap-3">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
               onClick={handleCreate}
               disabled={saving}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:w-auto"
             >
               {saving ? 'Đang lưu...' : 'Tạo'}
             </button>
@@ -277,7 +277,7 @@ export function HomePage() {
                 setEventName('')
                 setEventPassword('')
               }}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
             >
               Hủy
             </button>
@@ -298,11 +298,11 @@ export function HomePage() {
           events.map((event) => (
             <div
               key={event.id}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-green-300 hover:shadow-md"
+              className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-green-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-5"
             >
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-semibold text-slate-900">{event.name}</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-slate-500 break-words">
                   Mã: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
                   {' · '}
                   {event.participants.length} người tham gia
@@ -311,7 +311,7 @@ export function HomePage() {
                   {new Date(event.createdAt).toLocaleDateString('vi-VN')}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                 <span
                   className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${
                     event.accessPassword ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
@@ -324,14 +324,14 @@ export function HomePage() {
                 <button
                   type="button"
                   onClick={() => handleManage(event)}
-                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 sm:flex-none"
                 >
                   Quản lý
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(event)}
-                  className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  className="flex-1 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 sm:flex-none"
                 >
                   Xóa
                 </button>
