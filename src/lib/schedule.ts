@@ -1,122 +1,185 @@
 import type { Match, Pair } from '../types'
+import { shuffleArray } from './pairing'
 
-function matchKey(id1: string, id2: string): string {
-  return [id1, id2].sort().join('|')
-}
+type RawMatchup = { pair1Id: string; pair2Id: string; group?: string }
 
-/** Vòng bảng: mỗi cặp chỉ gặp nhau đúng 1 lần, mỗi vòng mỗi cặp chỉ đấu 1 trận */
-function generateRoundRobinRounds(
-  pairIds: string[],
-): { pair1Id: string; pair2Id: string; round: number }[] {
-  if (pairIds.length < 2) return []
-
-  const teams = [...pairIds]
-  if (teams.length % 2 === 1) {
-    teams.push('__BYE__')
-  }
-
-  const n = teams.length
-  const totalRounds = n - 1
-  const matchesPerRound = n / 2
-  const result: { pair1Id: string; pair2Id: string; round: number }[] = []
-  const seen = new Set<string>()
-
-  let rotation = [...teams]
-
-  for (let round = 0; round < totalRounds; round++) {
-    for (let i = 0; i < matchesPerRound; i++) {
-      const a = rotation[i]
-      const b = rotation[n - 1 - i]
-      if (a === '__BYE__' || b === '__BYE__') continue
-
-      const key = matchKey(a, b)
-      if (seen.has(key)) continue
-      seen.add(key)
-
-      result.push({ pair1Id: a, pair2Id: b, round: round + 1 })
+/** Tất cả cặp đấu vòng bảng (mỗi cặp gặp nhau đúng 1 lần) */
+function generateAllPairings(pairIds: string[]): RawMatchup[] {
+  const result: RawMatchup[] = []
+  for (let i = 0; i < pairIds.length; i++) {
+    for (let j = i + 1; j < pairIds.length; j++) {
+      result.push({ pair1Id: pairIds[i], pair2Id: pairIds[j] })
     }
-
-    const fixed = rotation[0]
-    const rest = rotation.slice(1)
-    rest.unshift(rest.pop()!)
-    rotation = [fixed, ...rest]
   }
-
   return result
 }
 
-function assignCourts(
-  rawMatches: { pair1Id: string; pair2Id: string; round: number; group?: string }[],
-  courts: number[],
-): Match[] {
-  if (courts.length === 0) return []
+/**
+ * Chia trận thành các vòng, mỗi vòng đủ `matchesPerRound` trận.
+ * Mỗi cặp chỉ xuất hiện tối đa 1 lần trong một vòng.
+ */
+function packMatchesIntoRounds(
+  matchups: RawMatchup[],
+  matchesPerRound: number,
+): RawMatchup[][] {
+  if (matchups.length === 0 || matchesPerRound < 1) return []
 
-  const seen = new Set<string>()
-  const uniqueMatches = rawMatches.filter((m) => {
-    const key = matchKey(m.pair1Id, m.pair2Id)
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+  const maxAttempts = 100
 
-  const byRound = new Map<number, typeof uniqueMatches>()
-  for (const m of uniqueMatches) {
-    const list = byRound.get(m.round) ?? []
-    list.push(m)
-    byRound.set(m.round, list)
-  }
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const remaining = shuffleArray(matchups)
+    const rounds: RawMatchup[][] = []
+    let failed = false
 
-  const result: Match[] = []
-  let displayRound = 1
+    while (remaining.length > 0) {
+      const round: RawMatchup[] = []
+      const usedPairIds = new Set<string>()
 
-  for (const roundNum of [...byRound.keys()].sort((a, b) => a - b)) {
-    const roundMatches = byRound.get(roundNum)!
-    for (let i = 0; i < roundMatches.length; i += courts.length) {
-      const batch = roundMatches.slice(i, i + courts.length)
-      batch.forEach((m, courtIdx) => {
-        const match: Match = {
-          id: crypto.randomUUID(),
-          pair1Id: m.pair1Id,
-          pair2Id: m.pair2Id,
-          round: displayRound,
-          court: courts[courtIdx],
-          completed: false,
+      for (let i = 0; i < remaining.length && round.length < matchesPerRound; ) {
+        const matchup = remaining[i]
+        if (!usedPairIds.has(matchup.pair1Id) && !usedPairIds.has(matchup.pair2Id)) {
+          round.push(matchup)
+          usedPairIds.add(matchup.pair1Id)
+          usedPairIds.add(matchup.pair2Id)
+          remaining.splice(i, 1)
+        } else {
+          i++
         }
-        if (m.group) match.group = m.group
-        result.push(match)
-      })
-      displayRound++
+      }
+
+      if (round.length === 0) {
+        failed = true
+        break
+      }
+
+      if (round.length < matchesPerRound && remaining.length > 0) {
+        failed = true
+        break
+      }
+
+      rounds.push(round)
     }
+
+    if (!failed) return rounds
   }
 
-  return result
+  return packMatchesIntoRoundsGreedy(matchups, matchesPerRound)
+}
+
+/** Dự phòng: ghép từng vòng, vòng cuối có thể thiếu trận nếu không chia hết */
+function packMatchesIntoRoundsGreedy(
+  matchups: RawMatchup[],
+  matchesPerRound: number,
+): RawMatchup[][] {
+  const remaining = [...matchups]
+  const rounds: RawMatchup[][] = []
+
+  while (remaining.length > 0) {
+    const round: RawMatchup[] = []
+    const usedPairIds = new Set<string>()
+
+    for (let i = 0; i < remaining.length && round.length < matchesPerRound; ) {
+      const matchup = remaining[i]
+      if (!usedPairIds.has(matchup.pair1Id) && !usedPairIds.has(matchup.pair2Id)) {
+        round.push(matchup)
+        usedPairIds.add(matchup.pair1Id)
+        usedPairIds.add(matchup.pair2Id)
+        remaining.splice(i, 1)
+      } else {
+        i++
+      }
+    }
+
+    if (round.length === 0) break
+    rounds.push(round)
+  }
+
+  return rounds
+}
+
+function buildMatchesFromRounds(
+  rounds: RawMatchup[][],
+  courts: number[],
+  startRound: number,
+): { matches: Match[]; nextRound: number } {
+  const matches: Match[] = []
+  let displayRound = startRound
+
+  for (const round of rounds) {
+    const shuffledMatchups = shuffleArray(round)
+    const courtsForRound = shuffleArray(courts).slice(0, shuffledMatchups.length)
+
+    shuffledMatchups.forEach((matchup, index) => {
+      const match: Match = {
+        id: crypto.randomUUID(),
+        pair1Id: matchup.pair1Id,
+        pair2Id: matchup.pair2Id,
+        round: displayRound,
+        court: courtsForRound[index],
+        completed: false,
+      }
+      if (matchup.group) match.group = matchup.group
+      matches.push(match)
+    })
+
+    displayRound++
+  }
+
+  return { matches, nextRound: displayRound }
+}
+
+function generateScheduleForPairIds(
+  pairIds: string[],
+  courts: number[],
+  group?: string,
+  startRound = 1,
+): { matches: Match[]; nextRound: number } {
+  if (pairIds.length < 2 || courts.length === 0) {
+    return { matches: [], nextRound: startRound }
+  }
+
+  const maxSimultaneous = Math.floor(pairIds.length / 2)
+  const matchesPerRound = Math.min(courts.length, maxSimultaneous)
+
+  if (matchesPerRound < 1) {
+    return { matches: [], nextRound: startRound }
+  }
+
+  const matchups = generateAllPairings(pairIds).map((m) =>
+    group ? { ...m, group } : m,
+  )
+
+  const rounds = packMatchesIntoRounds(matchups, matchesPerRound)
+  return buildMatchesFromRounds(rounds, courts, startRound)
 }
 
 export function generateSchedule(pairs: Pair[], courts: number[]): Match[] {
   if (pairs.length < 2 || courts.length === 0) return []
 
+  const sortedCourts = [...courts].sort((a, b) => a - b)
   const groups = [...new Set(pairs.map((p) => p.group).filter(Boolean))]
 
   if (groups.length > 0) {
-    const allMatches: {
-      pair1Id: string
-      pair2Id: string
-      round: number
-      group?: string
-    }[] = []
+    const allMatches: Match[] = []
+    let nextRound = 1
 
     for (const group of groups) {
       const pairIds = pairs.filter((p) => p.group === group).map((p) => p.id)
-      const groupMatches = generateRoundRobinRounds(pairIds).map((m) => ({
-        ...m,
+      const { matches, nextRound: after } = generateScheduleForPairIds(
+        pairIds,
+        sortedCourts,
         group,
-      }))
-      allMatches.push(...groupMatches)
+        nextRound,
+      )
+      allMatches.push(...matches)
+      nextRound = after
     }
 
-    return assignCourts(allMatches, courts)
+    return allMatches
   }
 
-  const pairIds = pairs.map((p) => p.id)
-  return assignCourts(generateRoundRobinRounds(pairIds), courts)
+  return generateScheduleForPairIds(
+    pairs.map((p) => p.id),
+    sortedCourts,
+  ).matches
 }
