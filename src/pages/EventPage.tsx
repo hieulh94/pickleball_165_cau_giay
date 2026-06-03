@@ -3,7 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
+import { PlayoffSection } from '../components/PlayoffSection'
 import { ResultDialog } from '../components/ResultDialog'
+import { filterGroupMatches, filterPlayoffMatches, isGroupMatch } from '../lib/matches'
 import { getPairLabel, randomPairs } from '../lib/pairing'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { generateSchedule } from '../lib/schedule'
@@ -129,6 +131,7 @@ export function EventPage() {
       pairs: false,
       schedule: false,
       standings: false,
+      playoffs: false,
     })
   }
 
@@ -169,16 +172,25 @@ export function EventPage() {
     }
   }
 
-  const matchesByRound = useMemo(() => {
+  const groupMatches = useMemo(() => {
     if (!event) return []
+    return filterGroupMatches(event.matches)
+  }, [event])
+
+  const playoffMatches = useMemo(() => {
+    if (!event) return []
+    return filterPlayoffMatches(event.matches)
+  }, [event])
+
+  const matchesByRound = useMemo(() => {
     const grouped = new Map<number, Match[]>()
-    for (const match of event.matches) {
+    for (const match of groupMatches) {
       const list = grouped.get(match.round) ?? []
       list.push(match)
       grouped.set(match.round, list)
     }
     return [...grouped.entries()].sort(([a], [b]) => a - b)
-  }, [event])
+  }, [groupMatches])
 
   const pairsByGroup = useMemo(() => {
     if (!event) return []
@@ -194,8 +206,8 @@ export function EventPage() {
 
   const standings = useMemo(() => {
     if (!event) return []
-    return calculateStandings(event.pairs, event.matches, event.splitGroups)
-  }, [event])
+    return calculateStandings(event.pairs, groupMatches, event.splitGroups)
+  }, [event, groupMatches])
 
   const unpairedParticipants = useMemo(() => {
     if (!event) return []
@@ -498,7 +510,7 @@ export function EventPage() {
       return
     }
 
-    if (event.matches.length > 0) {
+    if (groupMatches.length > 0) {
       setShowRegenerateConfirm(true)
       return
     }
@@ -507,10 +519,42 @@ export function EventPage() {
   }
 
   const doGenerateSchedule = () => {
-    const matches = generateSchedule(event.pairs, event.courts)
-    persist({ ...event, matches })
+    const newGroupMatches = generateSchedule(event.pairs, event.courts)
+    persist({ ...event, matches: [...newGroupMatches, ...playoffMatches] })
     setShowRegenerateConfirm(false)
     setShowCreateScheduleConfirm(false)
+  }
+
+  const handleCreatePlayoffMatch = (input: {
+    name: string
+    court: number
+    pair1Id: string
+    pair2Id: string
+  }) => {
+    if (!event.courts.includes(input.court)) {
+      alert('Sân không hợp lệ.')
+      return
+    }
+
+    const match: Match = {
+      id: crypto.randomUUID(),
+      pair1Id: input.pair1Id,
+      pair2Id: input.pair2Id,
+      round: 0,
+      court: input.court,
+      phase: 'playoff',
+      name: input.name,
+      completed: false,
+    }
+
+    persist({ ...event, matches: [...event.matches, match] })
+  }
+
+  const handleDeletePlayoffMatch = (matchId: string) => {
+    persist({
+      ...event,
+      matches: event.matches.filter((m) => m.id !== matchId),
+    })
   }
 
   const participantPendingDelete = participantToDelete
@@ -544,7 +588,9 @@ export function EventPage() {
     persist({
       ...event,
       courts: event.courts.filter((c) => c !== court),
-      matches: [],
+      matches: event.matches.filter(
+        (m) => m.phase === 'playoff' || (isGroupMatch(m) && m.court !== court),
+      ),
     })
   }
 
@@ -575,8 +621,8 @@ export function EventPage() {
   }
 
   const availableSections: SectionKey[] =
-    event.matches.length > 0
-      ? ['participants', 'pairs', 'schedule', 'standings']
+    groupMatches.length > 0
+      ? ['participants', 'pairs', 'schedule', 'standings', 'playoffs']
       : ['participants', 'pairs', 'schedule']
 
   return (
@@ -863,7 +909,7 @@ export function EventPage() {
           </p>
         )}
 
-        {event.matches.length > 0 && (
+        {groupMatches.length > 0 && (
           <>
             <div className="mt-6 flex flex-wrap gap-2">
               {event.pairs.map((pair) => {
@@ -963,14 +1009,14 @@ export function EventPage() {
         )}
       </CollapsibleSection>
 
-      {event.matches.length > 0 && (
+      {groupMatches.length > 0 && (
         <CollapsibleSection
           title="Bảng xếp hạng"
-          description="Xếp hạng theo số trận thắng, hiệu số điểm và tổng điểm ghi được"
+          description="Xếp hạng theo số trận thắng, hiệu số điểm và tổng điểm ghi được (chỉ tính vòng bảng)"
           visible={sectionVisibility.standings}
           onToggle={() => toggleSection('standings')}
         >
-          {!hasCompletedMatches(event.matches) && (
+          {!hasCompletedMatches(groupMatches) && (
             <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               Cập nhật kết quả từng trận để bảng xếp hạng tự động cập nhật.
             </p>
@@ -980,6 +1026,28 @@ export function EventPage() {
             pairs={event.pairs}
             participants={event.participants}
             splitGroups={event.splitGroups}
+          />
+        </CollapsibleSection>
+      )}
+
+      {groupMatches.length > 0 && event.courts.length > 0 && event.pairs.length >= 2 && (
+        <CollapsibleSection
+          title="Vòng loại trực tiếp"
+          description="Tứ kết, bán kết, chung kết — kết quả không cập nhật vào bảng xếp hạng"
+          visible={sectionVisibility.playoffs}
+          onToggle={() => toggleSection('playoffs')}
+        >
+          <PlayoffSection
+            pairs={event.pairs}
+            participants={event.participants}
+            courts={event.courts}
+            matches={playoffMatches}
+            standingsGroups={standings}
+            splitGroups={event.splitGroups}
+            pairNumberById={pairNumberById}
+            onCreateMatch={handleCreatePlayoffMatch}
+            onDeleteMatch={handleDeletePlayoffMatch}
+            onUpdateResult={setSelectedMatch}
           />
         </CollapsibleSection>
       )}

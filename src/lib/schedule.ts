@@ -116,6 +116,7 @@ function buildMatchesFromRounds(
         pair2Id: matchup.pair2Id,
         round: displayRound,
         court: courtsForRound[index],
+        phase: 'group',
         completed: false,
       }
       if (matchup.group) match.group = matchup.group

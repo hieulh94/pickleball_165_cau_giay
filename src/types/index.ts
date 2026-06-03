@@ -16,6 +16,8 @@ export interface Pair {
   isManual?: boolean
 }
 
+export type MatchPhase = 'group' | 'playoff'
+
 export interface Match {
   id: string
   pair1Id: string
@@ -23,6 +25,10 @@ export interface Match {
   round: number
   court: number
   group?: string
+  /** Vòng bảng (mặc định) hoặc vòng loại trực tiếp — trận playoff không tính vào BXH */
+  phase?: MatchPhase
+  /** Tên trận playoff: Tứ kết, Bán kết, Chung kết... */
+  name?: string
   score1?: number
   score2?: number
   completed: boolean

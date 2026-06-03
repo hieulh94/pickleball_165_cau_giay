@@ -57,13 +57,14 @@ export function CollapsibleSection({
   )
 }
 
-export type SectionKey = 'participants' | 'pairs' | 'schedule' | 'standings'
+export type SectionKey = 'participants' | 'pairs' | 'schedule' | 'standings' | 'playoffs'
 
 export const SECTION_LABELS: Record<SectionKey, string> = {
   participants: 'Người tham gia',
   pairs: 'Cặp đôi',
   schedule: 'Lịch thi đấu',
   standings: 'Bảng xếp hạng',
+  playoffs: 'Vòng loại trực tiếp',
 }
 
 export const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
@@ -71,6 +72,7 @@ export const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
   pairs: true,
   schedule: true,
   standings: true,
+  playoffs: true,
 }
 
 interface SectionToggleBarProps {

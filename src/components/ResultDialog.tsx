@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isPlayoffMatch } from '../lib/matches'
 import type { Match } from '../types'
 
 interface ResultDialogProps {
@@ -53,8 +54,9 @@ export function ResultDialog({
           <>
             <h3 className="text-lg font-semibold text-slate-900">Cập nhật kết quả</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Vòng {match.round} · Sân {match.court}
-              {match.group ? ` · ${match.group}` : ''}
+              {isPlayoffMatch(match)
+                ? `${match.name || 'Vòng loại trực tiếp'} · Sân ${match.court}`
+                : `Vòng ${match.round} · Sân ${match.court}${match.group ? ` · ${match.group}` : ''}`}
             </p>
 
             <div className="mt-6 space-y-4">
