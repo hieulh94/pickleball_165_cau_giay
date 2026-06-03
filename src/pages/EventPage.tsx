@@ -106,7 +106,10 @@ export function EventPage() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [participantToDelete, setParticipantToDelete] = useState<string | null>(null)
   const [showRandomPairsConfirm, setShowRandomPairsConfirm] = useState(false)
-  const [randomWheelLabels, setRandomWheelLabels] = useState<string[] | null>(null)
+  const [randomWheelSession, setRandomWheelSession] = useState<{
+    wheelLabels: string[]
+    pairLabels: string[]
+  } | null>(null)
   const pendingRandomApplyRef = useRef<(() => void) | null>(null)
   const [showCreateScheduleConfirm, setShowCreateScheduleConfirm] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
@@ -151,7 +154,7 @@ export function EventPage() {
   }, [id])
 
   const finishRandomWheel = useCallback(() => {
-    setRandomWheelLabels(null)
+    setRandomWheelSession(null)
     pendingRandomApplyRef.current?.()
     pendingRandomApplyRef.current = null
   }, [])
@@ -381,21 +384,23 @@ export function EventPage() {
       generatedPairs = result.pairs.map((pair) => ({ ...pair, locked: false }))
     }
 
+    const finalPairs = applyGroups([...lockedPairs, ...generatedPairs], event.splitGroups)
     const wheelNames =
       remainingParticipants.length > 0
         ? remainingParticipants.map((p) => p.name)
         : event.participants.map((p) => p.name)
+    const pairLabels = finalPairs.map((pair) => getPairLabel(pair, event.participants))
 
     pendingRandomApplyRef.current = () => {
       persist({
         ...event,
-        pairs: applyGroups([...lockedPairs, ...generatedPairs], event.splitGroups),
+        pairs: finalPairs,
         matches: [],
       })
     }
 
     setShowRandomPairsConfirm(false)
-    setRandomWheelLabels(wheelNames)
+    setRandomWheelSession({ wheelLabels: wheelNames, pairLabels })
   }
 
   const requestRandomPairs = () => {
@@ -1018,9 +1023,10 @@ export function EventPage() {
       />
 
       <RandomPairWheelOverlay
-        open={randomWheelLabels !== null}
-        labels={randomWheelLabels ?? []}
-        onComplete={finishRandomWheel}
+        open={randomWheelSession !== null}
+        labels={randomWheelSession?.wheelLabels ?? []}
+        pairLabels={randomWheelSession?.pairLabels ?? []}
+        onClose={finishRandomWheel}
       />
 
       <ConfirmDialog
