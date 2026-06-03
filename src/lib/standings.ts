@@ -182,19 +182,22 @@ export function comparePairsByStanding(
 export function formatPairStandingShort(
   info: PairStandingInfo | undefined,
   splitGroups: boolean,
+  pairGroup?: string | null,
 ): string {
   if (!info) return ''
-  if (info.played === 0) return `Hạng ${info.rank}`
-  const groupSuffix = splitGroups && info.group ? ` · ${info.group}` : ''
-  return `Hạng ${info.rank}${groupSuffix}`
+  const group = splitGroups ? (info.group ?? pairGroup ?? null) : null
+  const rankPart = `Hạng ${info.rank}`
+  if (group) return `${rankPart} · ${group}`
+  return rankPart
 }
 
 export function formatPairStandingDetail(
   info: PairStandingInfo | undefined,
   splitGroups: boolean,
+  pairGroup?: string | null,
 ): string | null {
   if (!info) return null
-  const rankLead = formatPairStandingShort(info, splitGroups)
+  const rankLead = formatPairStandingShort(info, splitGroups, pairGroup)
   if (info.played === 0) {
     return `${rankLead} · Chưa có trận vòng bảng`
   }

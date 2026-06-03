@@ -43,6 +43,8 @@ export interface PickleballEvent {
   participants: Participant[]
   pairs: Pair[]
   splitGroups: boolean
+  /** Số bảng khi bật chia bảng (2–26) */
+  groupCount?: number
   courts: number[]
   matches: Match[]
 }

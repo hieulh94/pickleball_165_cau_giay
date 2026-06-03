@@ -3,9 +3,12 @@ interface EventCodeDialogProps {
   title: string
   message: string
   value: string
-  inputType?: 'text' | 'password'
+  inputType?: 'text' | 'password' | 'number'
   placeholder?: string
   error?: string | null
+  confirmLabel?: string
+  inputMin?: number
+  inputMax?: number
   onChange: (value: string) => void
   onConfirm: () => void
   onCancel: () => void
@@ -19,6 +22,9 @@ export function EventCodeDialog({
   inputType = 'text',
   placeholder = 'Nhập mã event',
   error,
+  confirmLabel = 'Xác thực',
+  inputMin,
+  inputMax,
   onChange,
   onConfirm,
   onCancel,
@@ -34,6 +40,8 @@ export function EventCodeDialog({
         <input
           type={inputType}
           value={value}
+          min={inputMin}
+          max={inputMax}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onConfirm()}
           placeholder={placeholder}
@@ -54,7 +62,7 @@ export function EventCodeDialog({
             onClick={onConfirm}
             className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
           >
-            Xác thực
+            {confirmLabel}
           </button>
         </div>
       </div>

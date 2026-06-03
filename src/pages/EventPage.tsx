@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { EventCodeDialog } from '../components/EventCodeDialog'
 import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import { PlayoffSection } from '../components/PlayoffSection'
 import { ResultDialog } from '../components/ResultDialog'
+import {
+  applyGroupsToPairs,
+  getGroupForPairIndex,
+  MAX_GROUP_COUNT,
+  MIN_GROUP_COUNT,
+  resolveGroupCount,
+} from '../lib/groups'
 import { filterGroupMatches, filterPlayoffMatches, isGroupMatch } from '../lib/matches'
 import { getPairLabel, randomPairs } from '../lib/pairing'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
@@ -115,6 +123,9 @@ export function EventPage() {
   const pendingRandomApplyRef = useRef<(() => void) | null>(null)
   const [showCreateScheduleConfirm, setShowCreateScheduleConfirm] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
+  const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
+  const [groupCountInput, setGroupCountInput] = useState('2')
+  const [groupCountError, setGroupCountError] = useState<string | null>(null)
   const [sectionVisibility, setSectionVisibility] = useState(DEFAULT_SECTION_VISIBILITY)
 
   const toggleSection = (key: SectionKey) => {
@@ -261,17 +272,6 @@ export function EventPage() {
     return participant1.id !== participant2.id
   }, [event, manualPlayer1Name, manualPlayer2Name])
 
-  const applyGroups = (pairs: PickleballEvent['pairs'], splitGroups: boolean) => {
-    const cleanPairs = pairs.map((pair) => ({ ...pair, group: undefined }))
-    if (!splitGroups || cleanPairs.length < 2) return cleanPairs
-
-    const groupCount = Math.min(4, Math.max(2, Math.ceil(cleanPairs.length / 3)))
-    return cleanPairs.map((pair, index) => ({
-      ...pair,
-      group: `Bảng ${String.fromCharCode(65 + (index % groupCount))}`,
-    }))
-  }
-
   if (!isFirebaseConfigured()) {
     return (
       <div>
@@ -388,7 +388,11 @@ export function EventPage() {
 
     let generatedPairs: PickleballEvent['pairs'] = []
     if (remainingParticipants.length > 0) {
-      const result = randomPairs(remainingParticipants, event.splitGroups)
+      const result = randomPairs(
+        remainingParticipants,
+        event.splitGroups,
+        event.groupCount,
+      )
       if ('error' in result) {
         alert(result.error)
         return
@@ -396,7 +400,11 @@ export function EventPage() {
       generatedPairs = result.pairs.map((pair) => ({ ...pair, locked: false }))
     }
 
-    const finalPairs = applyGroups([...lockedPairs, ...generatedPairs], event.splitGroups)
+    const finalPairs = applyGroupsToPairs(
+      [...lockedPairs, ...generatedPairs],
+      event.splitGroups,
+      event.groupCount,
+    )
     const wheelNames =
       remainingParticipants.length > 0
         ? remainingParticipants.map((p) => p.name)
@@ -472,11 +480,9 @@ export function EventPage() {
     }
 
     let group: string | undefined
-    if (event.splitGroups && event.pairs.length >= 2) {
-      const nextPairsLength = event.pairs.length + 1
-      const groupCount = Math.min(4, Math.max(2, Math.ceil(nextPairsLength / 3)))
-      const groupIndex = event.pairs.length % groupCount
-      group = `Bảng ${String.fromCharCode(65 + groupIndex)}`
+    if (event.splitGroups && event.pairs.length >= 1) {
+      const count = resolveGroupCount(event.pairs.length + 1, event.groupCount)
+      group = getGroupForPairIndex(event.pairs.length, count)
     }
 
     persist({
@@ -523,6 +529,30 @@ export function EventPage() {
     persist({ ...event, matches: [...newGroupMatches, ...playoffMatches] })
     setShowRegenerateConfirm(false)
     setShowCreateScheduleConfirm(false)
+  }
+
+  const handleConfirmGroupCount = () => {
+    const count = parseInt(groupCountInput, 10)
+    if (
+      Number.isNaN(count) ||
+      count < MIN_GROUP_COUNT ||
+      count > MAX_GROUP_COUNT
+    ) {
+      setGroupCountError(
+        `Nhập số bảng từ ${MIN_GROUP_COUNT} đến ${MAX_GROUP_COUNT}.`,
+      )
+      return
+    }
+
+    persist({
+      ...event,
+      splitGroups: true,
+      groupCount: count,
+      pairs: applyGroupsToPairs(event.pairs, true, count),
+      matches: playoffMatches,
+    })
+    setShowGroupCountDialog(false)
+    setGroupCountError(null)
   }
 
   const handleCreatePlayoffMatch = (input: {
@@ -759,6 +789,35 @@ export function EventPage() {
         description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
         onToggle={() => toggleSection('pairs')}
+        headerExtra={
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={event.splitGroups}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  const suggested = resolveGroupCount(
+                    event.pairs.length,
+                    event.groupCount,
+                  )
+                  setGroupCountInput(String(suggested))
+                  setGroupCountError(null)
+                  setShowGroupCountDialog(true)
+                  return
+                }
+                persist({
+                  ...event,
+                  splitGroups: false,
+                  groupCount: undefined,
+                  pairs: applyGroupsToPairs(event.pairs, false),
+                  matches: playoffMatches,
+                })
+              }}
+              className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+            />
+            <span className="text-sm font-medium text-slate-700">Chia bảng đấu</span>
+          </label>
+        }
       >
         <button
           type="button"
@@ -1088,6 +1147,28 @@ export function EventPage() {
         confirmLabel="Xóa"
         onConfirm={doRemoveParticipant}
         onCancel={() => setParticipantToDelete(null)}
+      />
+
+      <EventCodeDialog
+        open={showGroupCountDialog}
+        title="Chia bảng đấu"
+        message="Nhập số bảng để chia cặp đôi (Bảng A, Bảng B, …). Lịch vòng bảng hiện tại sẽ bị xóa."
+        value={groupCountInput}
+        inputType="number"
+        inputMin={MIN_GROUP_COUNT}
+        inputMax={MAX_GROUP_COUNT}
+        placeholder={`VD: ${MIN_GROUP_COUNT}, 3, 4`}
+        confirmLabel="Áp dụng"
+        error={groupCountError}
+        onChange={(value) => {
+          setGroupCountInput(value)
+          if (groupCountError) setGroupCountError(null)
+        }}
+        onConfirm={handleConfirmGroupCount}
+        onCancel={() => {
+          setShowGroupCountDialog(false)
+          setGroupCountError(null)
+        }}
       />
 
       <RandomPairWheelOverlay

@@ -15,16 +15,22 @@ const PLAYOFF_NAME_PRESETS = ['Tứ kết', 'Bán kết', 'Chung kết']
 
 function PairStandingHint({
   pairId,
+  pairGroup,
   standingByPairId,
   splitGroups,
 }: {
   pairId: string
+  pairGroup?: string | null
   standingByPairId: Map<string, PairStandingInfo>
   splitGroups: boolean
 }) {
   if (!pairId) return null
 
-  const detail = formatPairStandingDetail(standingByPairId.get(pairId), splitGroups)
+  const detail = formatPairStandingDetail(
+    standingByPairId.get(pairId),
+    splitGroups,
+    pairGroup,
+  )
   if (!detail) return null
 
   const info = standingByPairId.get(pairId)
@@ -111,10 +117,19 @@ export function PlayoffSection({
   const [pair1Id, setPair1Id] = useState('')
   const [pair2Id, setPair2Id] = useState('')
 
-  const standingByPairId = useMemo(
-    () => buildPairStandingLookup(standingsGroups),
-    [standingsGroups],
-  )
+  const standingByPairId = useMemo(() => {
+    const map = buildPairStandingLookup(standingsGroups)
+    if (!splitGroups) return map
+
+    for (const pair of pairs) {
+      if (!pair.group) continue
+      const row = map.get(pair.id)
+      if (row) {
+        map.set(pair.id, { ...row, group: row.group ?? pair.group })
+      }
+    }
+    return map
+  }, [standingsGroups, pairs, splitGroups])
 
   const canCreate =
     name.trim().length > 0 &&
@@ -150,6 +165,7 @@ export function PlayoffSection({
         const standingShort = formatPairStandingShort(
           standingByPairId.get(pair.id),
           splitGroups,
+          pair.group,
         )
         const pairLabel = `Cặp ${num} — ${getPairLabel(pair, participants)}`
         return {
@@ -235,6 +251,7 @@ export function PlayoffSection({
               </select>
               <PairStandingHint
                 pairId={pair1Id}
+                pairGroup={pairs.find((p) => p.id === pair1Id)?.group}
                 standingByPairId={standingByPairId}
                 splitGroups={splitGroups}
               />
@@ -258,6 +275,7 @@ export function PlayoffSection({
               </select>
               <PairStandingHint
                 pairId={pair2Id}
+                pairGroup={pairs.find((p) => p.id === pair2Id)?.group}
                 standingByPairId={standingByPairId}
                 splitGroups={splitGroups}
               />

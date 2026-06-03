@@ -1,3 +1,4 @@
+import { applyGroupsToPairs } from './groups'
 import type { Participant, Pair } from '../types'
 
 export function shuffleArray<T>(array: T[]): T[] {
@@ -24,27 +25,17 @@ function pairShuffled(participants: Participant[]): Pair[] {
   return pairs
 }
 
-function assignGroups(pairs: Pair[], splitGroups: boolean): Pair[] {
-  if (splitGroups && pairs.length >= 2) {
-    const groupCount = Math.min(4, Math.max(2, Math.ceil(pairs.length / 3)))
-    pairs.forEach((pair, index) => {
-      const groupIndex = index % groupCount
-      pair.group = `Bảng ${String.fromCharCode(65 + groupIndex)}`
-    })
-  }
-  return pairs
-}
-
 export function randomPairs(
   participants: Participant[],
   splitGroups: boolean,
+  groupCount?: number,
 ): { pairs: Pair[] } | { error: string } {
   const level1 = participants.filter((p) => p.skillLevel === 1)
   const level2 = participants.filter((p) => p.skillLevel === 2)
 
   // Toàn trình độ 1 hoặc toàn trình độ 2 → ghép ngẫu nhiên bình thường
   if (level1.length === 0 || level2.length === 0) {
-    return { pairs: assignGroups(pairShuffled(participants), splitGroups) }
+    return { pairs: applyGroupsToPairs(pairShuffled(participants), splitGroups, groupCount) }
   }
 
   // Có cả hai trình độ → ghép chéo, không cùng trình độ
@@ -66,7 +57,7 @@ export function randomPairs(
     })
   }
 
-  return { pairs: assignGroups(pairs, splitGroups) }
+  return { pairs: applyGroupsToPairs(pairs, splitGroups, groupCount) }
 }
 
 export function getPairLabel(

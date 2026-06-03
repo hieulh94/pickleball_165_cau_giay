@@ -14,8 +14,18 @@ function generateAllPairings(pairIds: string[]): RawMatchup[] {
   return result
 }
 
+function canAddMoreToRound(
+  remaining: RawMatchup[],
+  usedPairIds: Set<string>,
+): boolean {
+  return remaining.some(
+    (matchup) =>
+      !usedPairIds.has(matchup.pair1Id) && !usedPairIds.has(matchup.pair2Id),
+  )
+}
+
 /**
- * Chia trận thành các vòng, mỗi vòng đủ `matchesPerRound` trận.
+ * Chia trận thành các vòng; mỗi vòng tối đa `matchesPerRound` trận (thường = số sân).
  * Mỗi cặp chỉ xuất hiện tối đa 1 lần trong một vòng.
  */
 function packMatchesIntoRounds(
@@ -52,7 +62,11 @@ function packMatchesIntoRounds(
         break
       }
 
-      if (round.length < matchesPerRound && remaining.length > 0) {
+      if (
+        round.length < matchesPerRound &&
+        remaining.length > 0 &&
+        canAddMoreToRound(remaining, usedPairIds)
+      ) {
         failed = true
         break
       }
@@ -100,87 +114,63 @@ function packMatchesIntoRoundsGreedy(
 function buildMatchesFromRounds(
   rounds: RawMatchup[][],
   courts: number[],
-  startRound: number,
-): { matches: Match[]; nextRound: number } {
+  startRound = 1,
+): Match[] {
   const matches: Match[] = []
   let displayRound = startRound
 
   for (const round of rounds) {
     const shuffledMatchups = shuffleArray(round)
-    const courtsForRound = shuffleArray(courts).slice(0, shuffledMatchups.length)
+    const shuffledCourts = shuffleArray(courts)
+    const slotCount = Math.min(shuffledMatchups.length, shuffledCourts.length)
 
-    shuffledMatchups.forEach((matchup, index) => {
+    for (let index = 0; index < slotCount; index++) {
+      const matchup = shuffledMatchups[index]
       const match: Match = {
         id: crypto.randomUUID(),
         pair1Id: matchup.pair1Id,
         pair2Id: matchup.pair2Id,
         round: displayRound,
-        court: courtsForRound[index],
+        court: shuffledCourts[index],
         phase: 'group',
         completed: false,
       }
       if (matchup.group) match.group = matchup.group
       matches.push(match)
-    })
+    }
 
     displayRound++
   }
 
-  return { matches, nextRound: displayRound }
+  return matches
 }
 
-function generateScheduleForPairIds(
-  pairIds: string[],
-  courts: number[],
-  group?: string,
-  startRound = 1,
-): { matches: Match[]; nextRound: number } {
-  if (pairIds.length < 2 || courts.length === 0) {
-    return { matches: [], nextRound: startRound }
+function collectAllMatchups(pairs: Pair[]): RawMatchup[] {
+  const groups = [...new Set(pairs.map((p) => p.group).filter(Boolean))].sort()
+
+  if (groups.length > 0) {
+    const allMatchups: RawMatchup[] = []
+    for (const group of groups) {
+      const pairIds = pairs.filter((p) => p.group === group).map((p) => p.id)
+      if (pairIds.length < 2) continue
+      allMatchups.push(
+        ...generateAllPairings(pairIds).map((m) => ({ ...m, group })),
+      )
+    }
+    return allMatchups
   }
 
-  const maxSimultaneous = Math.floor(pairIds.length / 2)
-  const matchesPerRound = Math.min(courts.length, maxSimultaneous)
-
-  if (matchesPerRound < 1) {
-    return { matches: [], nextRound: startRound }
-  }
-
-  const matchups = generateAllPairings(pairIds).map((m) =>
-    group ? { ...m, group } : m,
-  )
-
-  const rounds = packMatchesIntoRounds(matchups, matchesPerRound)
-  return buildMatchesFromRounds(rounds, courts, startRound)
+  return generateAllPairings(pairs.map((p) => p.id))
 }
 
 export function generateSchedule(pairs: Pair[], courts: number[]): Match[] {
   if (pairs.length < 2 || courts.length === 0) return []
 
   const sortedCourts = [...courts].sort((a, b) => a - b)
-  const groups = [...new Set(pairs.map((p) => p.group).filter(Boolean))]
+  const allMatchups = collectAllMatchups(pairs)
+  if (allMatchups.length === 0) return []
 
-  if (groups.length > 0) {
-    const allMatches: Match[] = []
-    let nextRound = 1
-
-    for (const group of groups) {
-      const pairIds = pairs.filter((p) => p.group === group).map((p) => p.id)
-      const { matches, nextRound: after } = generateScheduleForPairIds(
-        pairIds,
-        sortedCourts,
-        group,
-        nextRound,
-      )
-      allMatches.push(...matches)
-      nextRound = after
-    }
-
-    return allMatches
-  }
-
-  return generateScheduleForPairIds(
-    pairs.map((p) => p.id),
-    sortedCourts,
-  ).matches
+  const matchesPerRound = sortedCourts.length
+  const rounds = packMatchesIntoRounds(allMatchups, matchesPerRound)
+  return buildMatchesFromRounds(rounds, sortedCourts)
 }
