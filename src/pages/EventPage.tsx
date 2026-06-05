@@ -10,7 +10,7 @@ import { PlayoffSection } from '../components/PlayoffSection'
 import { ResultDialog } from '../components/ResultDialog'
 import {
   applyGroupsToPairs,
-  getGroupForPairIndex,
+  assignRandomGroup,
   MAX_GROUP_COUNT,
   MIN_GROUP_COUNT,
   resolveGroupCount,
@@ -484,11 +484,10 @@ export function EventPage() {
       return
     }
 
-    let group: string | undefined
-    if (event.splitGroups && event.pairs.length >= 1) {
-      const count = resolveGroupCount(event.pairs.length + 1, event.groupCount)
-      group = getGroupForPairIndex(event.pairs.length, count)
-    }
+    const group =
+      event.splitGroups && event.pairs.length >= 1
+        ? assignRandomGroup(event.pairs, event.groupCount)
+        : undefined
 
     persist({
       ...event,
@@ -1310,7 +1309,7 @@ export function EventPage() {
       <EventCodeDialog
         open={showGroupCountDialog}
         title="Chia bảng đấu"
-        message="Nhập số bảng để chia cặp đôi (Bảng A, Bảng B, …). Lịch vòng bảng hiện tại sẽ bị xóa."
+        message="Nhập số bảng để chia cặp đôi (Bảng A, Bảng B, …). Các cặp sẽ được xếp ngẫu nhiên vào bảng. Lịch vòng bảng hiện tại sẽ bị xóa."
         value={groupCountInput}
         inputType="number"
         inputMin={MIN_GROUP_COUNT}
