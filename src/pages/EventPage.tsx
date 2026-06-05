@@ -4,6 +4,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
+import { AutoSchedulePanel } from '../components/AutoSchedulePanel'
+import { ManualSchedulePanel } from '../components/ManualSchedulePanel'
 import { PlayoffSection } from '../components/PlayoffSection'
 import { ResultDialog } from '../components/ResultDialog'
 import {
@@ -123,6 +125,9 @@ export function EventPage() {
   const pendingRandomApplyRef = useRef<(() => void) | null>(null)
   const [showCreateScheduleConfirm, setShowCreateScheduleConfirm] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
+  const [scheduleCreateMode, setScheduleCreateMode] = useState<'auto' | 'manual' | null>(
+    null,
+  )
   const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
   const [groupCountInput, setGroupCountInput] = useState('2')
   const [groupCountError, setGroupCountError] = useState<string | null>(null)
@@ -529,6 +534,76 @@ export function EventPage() {
     persist({ ...event, matches: [...newGroupMatches, ...playoffMatches] })
     setShowRegenerateConfirm(false)
     setShowCreateScheduleConfirm(false)
+    setScheduleCreateMode(null)
+  }
+
+  const toggleScheduleCreateMode = (mode: 'auto' | 'manual') => {
+    setScheduleCreateMode((prev) => (prev === mode ? null : mode))
+  }
+
+  const handleCreateManualGroupMatch = (input: {
+    round: number
+    court: number
+    pair1Id: string
+    pair2Id: string
+  }) => {
+    if (!event.courts.includes(input.court)) {
+      alert('Sân không hợp lệ.')
+      return
+    }
+
+    const pair1 = event.pairs.find((p) => p.id === input.pair1Id)
+    const pair2 = event.pairs.find((p) => p.id === input.pair2Id)
+    if (!pair1 || !pair2) return
+
+    if (event.splitGroups && pair1.group && pair2.group && pair1.group !== pair2.group) {
+      alert('Hai cặp phải cùng bảng khi đã chia bảng.')
+      return
+    }
+
+    const sameRoundMatches = groupMatches.filter((m) => m.round === input.round)
+    const pairIdsInRound = new Set(
+      sameRoundMatches.flatMap((m) => [m.pair1Id, m.pair2Id]),
+    )
+    if (pairIdsInRound.has(input.pair1Id) || pairIdsInRound.has(input.pair2Id)) {
+      alert('Mỗi cặp chỉ được thi đấu một trận trong cùng một vòng.')
+      return
+    }
+
+    if (sameRoundMatches.some((m) => m.court === input.court)) {
+      alert(`Sân ${input.court} đã có trận ở vòng ${input.round}.`)
+      return
+    }
+
+    const isDuplicateMatchup = groupMatches.some(
+      (m) =>
+        (m.pair1Id === input.pair1Id && m.pair2Id === input.pair2Id) ||
+        (m.pair1Id === input.pair2Id && m.pair2Id === input.pair1Id),
+    )
+    if (isDuplicateMatchup) {
+      alert('Hai cặp này đã có trận đấu trong lịch vòng bảng.')
+      return
+    }
+
+    const match: Match = {
+      id: crypto.randomUUID(),
+      pair1Id: input.pair1Id,
+      pair2Id: input.pair2Id,
+      round: input.round,
+      court: input.court,
+      phase: 'group',
+      completed: false,
+    }
+    if (pair1.group) match.group = pair1.group
+
+    persist({ ...event, matches: [...event.matches, match] })
+  }
+
+  const handleDeleteGroupMatch = (matchId: string) => {
+    persist({
+      ...event,
+      matches: event.matches.filter((m) => m.id !== matchId),
+    })
   }
 
   const handleConfirmGroupCount = () => {
@@ -907,7 +982,7 @@ export function EventPage() {
 
       <CollapsibleSection
         title="Lịch thi đấu"
-        description="Nhập số sân cụ thể để tạo lịch thi đấu vòng bảng"
+        description="Thêm sân, rồi tạo lịch tự động hoặc thêm từng trận thủ công"
         visible={sectionVisibility.schedule}
         onToggle={() => toggleSection('schedule')}
       >
@@ -932,14 +1007,6 @@ export function EventPage() {
             className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             Thêm sân
-          </button>
-          <button
-            type="button"
-            onClick={handleGenerateSchedule}
-            disabled={event.courts.length === 0}
-            className="rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none bg-blue-600 hover:bg-blue-700 disabled:hover:bg-slate-300"
-          >
-            📅 Tạo lịch thi đấu
           </button>
         </div>
 
@@ -968,6 +1035,58 @@ export function EventPage() {
           </p>
         )}
 
+        {event.pairs.length >= 2 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => toggleScheduleCreateMode('auto')}
+              disabled={event.courts.length === 0}
+              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none ${
+                scheduleCreateMode === 'auto'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'border border-blue-300 bg-white text-blue-800 hover:bg-blue-50'
+              }`}
+            >
+              📅 Tạo lịch tự động
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleScheduleCreateMode('manual')}
+              disabled={event.courts.length === 0}
+              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none ${
+                scheduleCreateMode === 'manual'
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'border border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
+              }`}
+            >
+              ✋ Tạo lịch thủ công
+            </button>
+          </div>
+        )}
+
+        {scheduleCreateMode === 'auto' && event.courts.length > 0 && event.pairs.length >= 2 && (
+          <AutoSchedulePanel
+            pairCount={event.pairs.length}
+            courts={event.courts}
+            hasExistingSchedule={groupMatches.length > 0}
+            onGenerate={handleGenerateSchedule}
+          />
+        )}
+
+        {scheduleCreateMode === 'manual' &&
+          event.courts.length > 0 &&
+          event.pairs.length >= 2 && (
+            <ManualSchedulePanel
+              pairs={event.pairs}
+              participants={event.participants}
+              courts={event.courts}
+              groupMatches={groupMatches}
+              splitGroups={event.splitGroups}
+              pairNumberById={pairNumberById}
+              onCreateMatch={handleCreateManualGroupMatch}
+            />
+          )}
+
         {groupMatches.length > 0 && (
           <>
             <div className="mt-6 flex flex-wrap gap-2">
@@ -987,12 +1106,41 @@ export function EventPage() {
             </div>
 
             <div className="mt-5 space-y-8">
-              {matchesByRound.map(([round, matches]) => (
+              {matchesByRound.map(([round, matches]) => {
+                const playingPairIds = new Set(
+                  matches.flatMap((m) => [m.pair1Id, m.pair2Id]),
+                )
+                const restingPairs = event.pairs.filter(
+                  (pair) => !playingPairIds.has(pair.id),
+                )
+
+                return (
                 <div key={round}>
-                  <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                    Vòng {round}
-                  </h4>
-                  <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+                  <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Vòng {round}
+                    </h4>
+                    <span className="text-xs text-slate-400">
+                      {matches.length} trận
+                      {event.courts.length === 1 ? ' · 1 sân' : ''}
+                    </span>
+                  </div>
+                  {restingPairs.length > 0 && (
+                    <p className="mb-3 text-xs text-slate-500">
+                      Nghỉ:{' '}
+                      {restingPairs
+                        .map((pair) => {
+                          const num = pairNumberById.get(pair.id) ?? 0
+                          return `Cặp ${num}`
+                        })
+                        .join(', ')}
+                    </p>
+                  )}
+                  <div
+                    className={`grid grid-cols-1 items-stretch gap-4 ${
+                      matches.length === 1 ? 'max-w-xl' : 'md:grid-cols-2'
+                    }`}
+                  >
                     {matches
                       .sort((a, b) => a.court - b.court)
                       .map((match) => {
@@ -1010,20 +1158,29 @@ export function EventPage() {
                                 : 'border-slate-200 bg-white'
                             }`}
                           >
-                            <div className="mb-4 flex flex-wrap items-center gap-2">
-                              <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
-                                Sân {match.court}
-                              </span>
-                              {match.group && (
-                                <span className="rounded-lg bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
-                                  {match.group}
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
+                                  Sân {match.court}
                                 </span>
-                              )}
-                              {match.completed && (
-                                <span className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-semibold text-white">
-                                  Hoàn thành
-                                </span>
-                              )}
+                                {match.group && (
+                                  <span className="rounded-lg bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                                    {match.group}
+                                  </span>
+                                )}
+                                {match.completed && (
+                                  <span className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-semibold text-white">
+                                    Hoàn thành
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteGroupMatch(match.id)}
+                                className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                              >
+                                Xóa
+                              </button>
                             </div>
 
                             <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-stretch gap-2">
@@ -1062,7 +1219,8 @@ export function EventPage() {
                       })}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )}
@@ -1194,7 +1352,7 @@ export function EventPage() {
       <ConfirmDialog
         open={showCreateScheduleConfirm}
         title="Tạo lịch thi đấu"
-        message="Hệ thống sẽ tạo lịch thi đấu vòng bảng từ danh sách cặp đôi hiện tại."
+        message="Hệ thống sẽ tự động tạo lịch vòng bảng (round-robin) từ danh sách cặp đôi hiện tại."
         confirmLabel="Tạo lịch"
         onConfirm={doGenerateSchedule}
         onCancel={() => setShowCreateScheduleConfirm(false)}
