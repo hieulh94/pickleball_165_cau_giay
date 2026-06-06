@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
@@ -19,6 +19,11 @@ import { filterGroupMatches, filterPlayoffMatches, isGroupMatch } from '../lib/m
 import { getPairLabel, randomPairs } from '../lib/pairing'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { generateSchedule } from '../lib/schedule'
+import {
+  eventRequiresPassword,
+  grantEventAccess,
+  isEventAccessGranted,
+} from '../lib/eventAccess'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { subscribeEvent, upsertEvent } from '../lib/storage'
 import { calculateStandings, hasCompletedMatches } from '../lib/standings'
@@ -105,6 +110,7 @@ function PairDisplayCard({
 
 export function EventPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [event, setEvent] = useState<PickleballEvent | null>(null)
   const [loading, setLoading] = useState(isFirebaseConfigured())
   const [error, setError] = useState<string | null>(null)
@@ -132,6 +138,11 @@ export function EventPage() {
   const [groupCountInput, setGroupCountInput] = useState('2')
   const [groupCountError, setGroupCountError] = useState<string | null>(null)
   const [sectionVisibility, setSectionVisibility] = useState(DEFAULT_SECTION_VISIBILITY)
+  const [accessGranted, setAccessGranted] = useState(() =>
+    id ? isEventAccessGranted(id) : false,
+  )
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   const toggleSection = (key: SectionKey) => {
     setSectionVisibility((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -171,6 +182,17 @@ export function EventPage() {
 
     return unsubscribe
   }, [id])
+
+  useEffect(() => {
+    if (!id || !event) return
+
+    if (!eventRequiresPassword(event.accessPassword)) {
+      setAccessGranted(true)
+      return
+    }
+
+    setAccessGranted(isEventAccessGranted(id))
+  }, [id, event])
 
   const finishRandomWheel = useCallback(() => {
     setRandomWheelSession(null)
@@ -316,6 +338,50 @@ export function EventPage() {
         <Link to="/" className="mt-4 inline-block text-green-600 hover:underline">
           ← Quay lại
         </Link>
+      </div>
+    )
+  }
+
+  const handlePasswordConfirm = () => {
+    if (!id) return
+    if (passwordInput !== event.accessPassword) {
+      setPasswordError('Mật khẩu không đúng.')
+      return
+    }
+    grantEventAccess(id)
+    setAccessGranted(true)
+    setPasswordInput('')
+    setPasswordError(null)
+  }
+
+  if (!accessGranted && eventRequiresPassword(event.accessPassword)) {
+    return (
+      <div>
+        <Link to="/" className="text-sm text-green-600 hover:underline">
+          ← Quay lại danh sách
+        </Link>
+        <div className="mt-16 text-center">
+          <h2 className="text-xl font-bold text-slate-900">{event.name}</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Event này yêu cầu mật khẩu để xem.
+          </p>
+        </div>
+        <EventCodeDialog
+          open
+          title="Nhập mật khẩu"
+          message="Nhập mật khẩu event do ban tổ chức cung cấp."
+          value={passwordInput}
+          inputType="password"
+          placeholder="Nhập mật khẩu event"
+          error={passwordError}
+          confirmLabel="Vào xem"
+          onChange={(value) => {
+            setPasswordInput(value)
+            if (passwordError) setPasswordError(null)
+          }}
+          onConfirm={handlePasswordConfirm}
+          onCancel={() => navigate('/')}
+        />
       </div>
     )
   }

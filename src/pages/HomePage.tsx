@@ -4,6 +4,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import { isFirebaseConfigured } from '../lib/firebase'
+import { grantEventAccess } from '../lib/eventAccess'
 import { deleteEvent, subscribeEvents, upsertEvent } from '../lib/storage'
 import type { PickleballEvent } from '../types'
 
@@ -155,12 +156,8 @@ export function HomePage() {
     const targetEvent = pendingEvent
     closeCodeDialog()
 
-    if (action === 'manage') {
-      navigate(`/event/${targetEvent.id}`)
-      return
-    }
-
-    if (action === 'join') {
+    if (action === 'manage' || action === 'join') {
+      grantEventAccess(targetEvent.id)
       navigate(`/event/${targetEvent.id}`)
       return
     }
