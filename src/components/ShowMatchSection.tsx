@@ -331,13 +331,7 @@ export function ShowMatchSection({
         onToggle={onCreateFormToggle}
         className="mt-0"
       >
-        <p className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3 text-sm text-fuchsia-900">
-          Mỗi kèo showmatch là Bo3 (chạm 2): tạo một lịch trận, sau đó nhập điểm từng ván.
-          Có thể lưu tạm sau Ván 1 hoặc khi tỷ số 1-1 (chờ Ván 3); 2-0 sau Ván 2 thì kết thúc kèo.
-          Kết quả không ảnh hưởng bảng xếp hạng.
-        </p>
-
-        <div className="mt-4 rounded-2xl border border-fuchsia-200 bg-fuchsia-50/50 p-4 sm:p-5">
+        <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50/50 p-4 sm:p-5">
         <h4 className="text-sm font-semibold text-fuchsia-900">Tạo trận showmatch</h4>
         <p className="mt-1 text-xs text-fuchsia-800">
           Nhập tên 4 người chơi (2 cặp), ngày giờ — kèo Bo3 (chạm 2).
