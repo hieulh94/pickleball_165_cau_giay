@@ -4,7 +4,7 @@ Hướng dẫn cho AI agent khi làm việc trong repo này. Đọc file này tr
 
 ## Mục tiêu dự án
 
-Web app tổ chức **mini game pickleball** nội bộ CLB: tạo event, thêm người chơi, ghép cặp đôi, chia bảng, sinh lịch vòng bảng theo sân, nhập kết quả, bảng xếp hạng và vòng playoff. Dữ liệu lưu **Firebase Firestore**, đồng bộ realtime giữa nhiều thiết bị.
+Web app tổ chức **mini game pickleball** và **showmatch tuần** nội bộ CLB: tạo event, thêm người chơi, ghép cặp đôi, chia bảng, sinh lịch vòng bảng theo sân, nhập kết quả, bảng xếp hạng và vòng playoff. Event `showmatch` có UI gọn (ghép cặp tay + lịch trận có ngày giờ); **một người có thể thuộc nhiều cặp**. Dữ liệu lưu **Firebase Firestore**, đồng bộ realtime giữa nhiều thiết bị.
 
 ## Tech stack
 
@@ -32,7 +32,8 @@ src/
   main.tsx, App.tsx          # Entry, routes
   pages/
     HomePage.tsx             # Danh sách event, tạo/xóa, join bằng mã
-    EventPage.tsx            # Toàn bộ flow 1 event (file lớn ~1100+ dòng)
+    EventPage.tsx            # Flow mini game (tournament); delegate showmatch
+    ShowMatchEventPage.tsx   # UI gọn cho event showmatch tuần
   components/                # UI tái sử dụng (dialog, playoff, BXH, wheel...)
   lib/                       # Logic thuần — ưu tiên đặt nghiệp vụ ở đây
   types/index.ts             # PickleballEvent, Participant, Pair, Match
@@ -50,8 +51,8 @@ vercel.json                  # SPA rewrite → index.html
 
 - **Participant**: `skillLevel` chỉ `1 | 2`
 - **Pair**: hai `playerId`, optional `group` (tên bảng, VD `Bảng A`), `isManual` / `locked` cho ghép tay
-- **Match**: `round`, `court`, `phase` (`group` | `playoff`), `completed`, điểm `score1`/`score2`
-- **PickleballEvent**: document Firestore; gồm `accessCode`, `accessPassword`, `splitGroups`, `groupCount`, `courts[]`, `participants`, `pairs`, `matches`
+- **Match**: `round`, `court`, `phase` (`group` | `playoff` | `showmatch`), `scheduledAt?`, `showmatchFormat?` (`best_of_3`), `games?[]`, `completed`; showmatch Bo3: `score1`/`score2` = số ván thắng
+- **PickleballEvent**: document Firestore; gồm `eventType` (`tournament` | `showmatch`), `accessCode`, `accessPassword`, `splitGroups`, `groupCount`, `courts[]`, `participants`, `pairs`, `matches`
 
 Firestore: collection `events`, document id = `event.id`. Schema mô tả trong `README.md`.
 
@@ -64,7 +65,9 @@ Firestore: collection `events`, document id = `event.id`. Schema mô tả trong 
 | `lib/pairing.ts` | `randomPairs`: ghép chéo trình độ 1↔2 (số lượng hai level phải bằng nhau), hoặc shuffle thuần; `shuffleArray`, `getPairLabel` |
 | `lib/groups.ts` | Chia bảng A–Z (`MIN_GROUP_COUNT` 2, `MAX_GROUP_COUNT` 26), `applyGroupsToPairs` |
 | `lib/schedule.ts` | `generateSchedule`: round-robin trong từng bảng, gói theo số sân; chèn vòng nghỉ nếu không thể tránh cặp đá liên tiếp (VD 4 cặp / 1 sân) |
-| `lib/matches.ts` | `isGroupMatch` / `isPlayoffMatch` — playoff **không** tính BXH |
+| `lib/matches.ts` | `isGroupMatch` / `isPlayoffMatch` / `isShowMatch` — playoff/showmatch **không** tính BXH |
+| `lib/showmatch.ts` | `formatScheduledAt`, `sortShowMatches`, `getDefaultShowmatchName`, `toScheduledISO` |
+| `lib/showmatchScoring.ts` | Bo3: `countGamesWon`, `isBo3Decided`, `validateShowmatchGames`, `formatShowmatchResult` |
 | `lib/standings.ts` | `calculateStandings`, xếp hạng: thắng → hiệu số → điểm ghi |
 | `lib/pairColors.ts` | Màu thẻ cặp theo số thứ tự |
 
@@ -102,7 +105,7 @@ Firestore: collection `events`, document id = `event.id`. Schema mô tả trong 
 ## Khi sửa code — lưu ý
 
 1. Đổi shape `PickleballEvent` → cập nhật `types`, `storage.ts` migrate nếu cần, và docs trong `README.md`.
-2. Trận `phase: 'playoff'` phải tiếp tục loại khỏi BXH (`standings.ts` / `isGroupMatch`).
+2. Trận `phase: 'playoff'` và `phase: 'showmatch'` phải tiếp tục loại khỏi BXH (`standings.ts` / `isGroupMatch`).
 3. `EventPage.tsx` rất lớn: tách component/lib mới thay vì nhồn thêm hàng trăm dòng nếu có thể.
 4. Không hardcode Firebase credentials; không commit `.env`.
 5. Sau đổi rules/schema Firestore, nhắc publish `firestore.rules` trên Console.
@@ -116,5 +119,6 @@ Firestore: collection `events`, document id = `event.id`. Schema mô tả trong 
 | Trang chi tiết event | `src/pages/EventPage.tsx` |
 | Trang chủ | `src/pages/HomePage.tsx` |
 | Playoff UI | `src/components/PlayoffSection.tsx` |
+| Showmatch UI | `src/components/ShowMatchSection.tsx`, `ShowmatchResultDialog.tsx`, `src/pages/ShowMatchEventPage.tsx` |
 | Nhập kết quả | `src/components/ResultDialog.tsx` |
 | Deploy / Firebase setup | `README.md` |

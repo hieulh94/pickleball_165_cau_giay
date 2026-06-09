@@ -16,7 +16,14 @@ export interface Pair {
   isManual?: boolean
 }
 
-export type MatchPhase = 'group' | 'playoff'
+export type MatchPhase = 'group' | 'playoff' | 'showmatch'
+
+export type ShowmatchFormat = 'best_of_3'
+
+export interface ShowmatchGame {
+  score1: number
+  score2: number
+}
 
 export interface Match {
   id: string
@@ -25,14 +32,23 @@ export interface Match {
   round: number
   court: number
   group?: string
-  /** Vòng bảng (mặc định) hoặc vòng loại trực tiếp — trận playoff không tính vào BXH */
+  /** Vòng bảng (mặc định), playoff hoặc showmatch — playoff/showmatch không tính vào BXH */
   phase?: MatchPhase
-  /** Tên trận playoff: Tứ kết, Bán kết, Chung kết... */
+  /** Tên trận playoff/showmatch */
   name?: string
+  /** Thời gian đấu (ISO 8601) — dùng cho showmatch */
+  scheduledAt?: string
+  /** Bo3 (chạm 2) — chỉ showmatch */
+  showmatchFormat?: ShowmatchFormat
+  /** Điểm từng ván — chỉ showmatch Bo3 */
+  games?: ShowmatchGame[]
+  /** Số ván thắng (Bo3) hoặc điểm ván đơn (legacy) */
   score1?: number
   score2?: number
   completed: boolean
 }
+
+export type EventType = 'tournament' | 'showmatch'
 
 export interface PickleballEvent {
   id: string
@@ -40,6 +56,8 @@ export interface PickleballEvent {
   accessCode: string
   accessPassword: string
   createdAt: string
+  /** Mini game (mặc định) hoặc showmatch tuần */
+  eventType?: EventType
   participants: Participant[]
   pairs: Pair[]
   splitGroups: boolean

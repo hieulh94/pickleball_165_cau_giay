@@ -34,6 +34,7 @@ import {
   type SectionKey,
 } from '../components/CollapsibleSection'
 import { StandingsContent } from '../components/StandingsSection'
+import { ShowMatchEventPage } from './ShowMatchEventPage'
 import type { Match, Pair, Participant, PickleballEvent, SkillLevel } from '../types'
 
 function isManualPair(pair: Pair) {
@@ -123,6 +124,7 @@ export function EventPage() {
   const [eventNameInput, setEventNameInput] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [participantToDelete, setParticipantToDelete] = useState<string | null>(null)
+  const [matchToDelete, setMatchToDelete] = useState<string | null>(null)
   const [showRandomPairsConfirm, setShowRandomPairsConfirm] = useState(false)
   const [randomWheelSession, setRandomWheelSession] = useState<{
     wheelLabels: string[]
@@ -384,6 +386,10 @@ export function EventPage() {
         />
       </div>
     )
+  }
+
+  if (event.eventType === 'showmatch') {
+    return <ShowMatchEventPage event={event} onPersist={persist} />
   }
 
   const addParticipant = () => {
@@ -664,11 +670,23 @@ export function EventPage() {
     persist({ ...event, matches: [...event.matches, match] })
   }
 
+  const pendingDeleteMatch = matchToDelete
+    ? event.matches.find((m) => m.id === matchToDelete)
+    : null
+
+  const deleteMatchMessage = pendingDeleteMatch
+    ? (() => {
+        const pair1 = event.pairs.find((p) => p.id === pendingDeleteMatch.pair1Id)
+        const pair2 = event.pairs.find((p) => p.id === pendingDeleteMatch.pair2Id)
+        const label1 = pair1 ? getPairLabel(pair1, event.participants) : '—'
+        const label2 = pair2 ? getPairLabel(pair2, event.participants) : '—'
+        const namePart = pendingDeleteMatch.name ? ` "${pendingDeleteMatch.name}"` : ''
+        return `Bạn có chắc muốn xóa trận${namePart} (${label1} VS ${label2})?`
+      })()
+    : ''
+
   const handleDeleteGroupMatch = (matchId: string) => {
-    persist({
-      ...event,
-      matches: event.matches.filter((m) => m.id !== matchId),
-    })
+    setMatchToDelete(matchId)
   }
 
   const handleConfirmGroupCount = () => {
@@ -721,10 +739,17 @@ export function EventPage() {
   }
 
   const handleDeletePlayoffMatch = (matchId: string) => {
+    setMatchToDelete(matchId)
+  }
+
+  const confirmDeleteMatch = () => {
+    if (!matchToDelete) return
     persist({
       ...event,
-      matches: event.matches.filter((m) => m.id !== matchId),
+      matches: event.matches.filter((m) => m.id !== matchToDelete),
     })
+    setMatchToDelete(null)
+    if (selectedMatch?.id === matchToDelete) setSelectedMatch(null)
   }
 
   const participantPendingDelete = participantToDelete
@@ -1357,6 +1382,15 @@ export function EventPage() {
         onSubmit={(s1, s2) => {
           if (selectedMatch) handleUpdateResult(selectedMatch.id, s1, s2)
         }}
+      />
+
+      <ConfirmDialog
+        open={!!matchToDelete}
+        title="Xóa trận"
+        message={deleteMatchMessage}
+        confirmLabel="Xóa"
+        onConfirm={confirmDeleteMatch}
+        onCancel={() => setMatchToDelete(null)}
       />
 
       <ConfirmDialog

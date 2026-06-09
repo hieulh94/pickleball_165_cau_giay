@@ -35,3 +35,13 @@ body {
 .firework-flash {
   animation: firework-flash-pulse 1.4s ease-in-out infinite;
 }
+
+.coverflow-stage {
+  transform-style: preserve-3d;
+}
+
+.coverflow-slide {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}

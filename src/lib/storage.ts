@@ -6,7 +6,7 @@ import {
   setDoc,
   type Unsubscribe,
 } from 'firebase/firestore'
-import type { PickleballEvent } from '../types'
+import type { Match, PickleballEvent } from '../types'
 import { getDb } from './firebase'
 
 const EVENTS_COLLECTION = 'events'
@@ -31,8 +31,23 @@ function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
   if (typeof event.accessPassword !== 'string') {
     event.accessPassword = ''
   }
+  if (event.eventType !== 'tournament' && event.eventType !== 'showmatch') {
+    event.eventType = 'tournament'
+  }
+
+  if (Array.isArray(event.matches)) {
+    event.matches = event.matches.map((match) => migrateMatch(match))
+  }
 
   return event
+}
+
+function migrateMatch(match: Match): Match {
+  if (match.phase !== 'showmatch') return match
+  if (match.showmatchFormat !== 'best_of_3') {
+    return { ...match, showmatchFormat: 'best_of_3' }
+  }
+  return match
 }
 
 function docToEvent(id: string, data: Record<string, unknown>): PickleballEvent {

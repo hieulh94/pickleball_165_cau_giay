@@ -1,12 +1,14 @@
 # Pickleball 165 Cầu Giấy - Mini Game
 
-Website tổ chức mini game pickleball: tạo event, ghép cặp đôi, chia bảng, lịch thi đấu và cập nhật kết quả.
+Website tổ chức mini game pickleball và showmatch tuần: tạo event, ghép cặp đôi, chia bảng, lịch thi đấu và cập nhật kết quả.
 
 Dữ liệu lưu trên **Firebase Firestore** — đồng bộ giữa mọi thiết bị khi deploy.
 
 ## Tính năng
 
-- **Tạo Event** — Quản lý nhiều mini game
+- **Tạo Event** — Mini game hoặc showmatch tuần (mỗi tuần một event showmatch)
+- **Showmatch tuần** — Ghép cặp tay, lên lịch Bo3 (chạm 2), nhập điểm từng ván (không BXH)
+- **Highlight tuần** — Carousel vuốt ngang xem lịch showmatch theo từng tuần trên trang chủ
 - **Người tham gia** — Thêm tên và trình độ (1 hoặc 2)
 - **Random cặp đôi** — Ghép cặp không cùng trình độ
 - **Chia bảng đấu** — Checkbox để chia cặp vào các bảng A, B, C...
@@ -109,11 +111,13 @@ events (collection)
         ├── id
         ├── name
         ├── createdAt
+        ├── eventType: 'tournament' | 'showmatch'  (mặc định tournament)
+        ├── accessCode, accessPassword
         ├── splitGroups
         ├── courts: number[]
         ├── participants: [...]
         ├── pairs: [...]
-        └── matches: [...]
+        └── matches: [...]  (phase: group | playoff | showmatch; showmatch: scheduledAt, showmatchFormat, games[])
 ```
 
 ---

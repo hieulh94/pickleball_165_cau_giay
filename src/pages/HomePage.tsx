@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
+import { WeeklyShowmatchHighlight } from '../components/WeeklyShowmatchHighlight'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { grantEventAccess } from '../lib/eventAccess'
+import { getDefaultShowmatchName } from '../lib/showmatch'
 import { deleteEvent, subscribeEvents, upsertEvent } from '../lib/storage'
-import type { PickleballEvent } from '../types'
+import type { EventType, PickleballEvent } from '../types'
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -16,6 +18,7 @@ export function HomePage() {
   const [showForm, setShowForm] = useState(false)
   const [eventName, setEventName] = useState('')
   const [eventPassword, setEventPassword] = useState('')
+  const [eventType, setEventType] = useState<EventType>('tournament')
   const [joinCode, setJoinCode] = useState('')
   const [saving, setSaving] = useState(false)
   const [codeDialogOpen, setCodeDialogOpen] = useState(false)
@@ -87,6 +90,7 @@ export function HomePage() {
       accessCode: code,
       accessPassword: password,
       createdAt: new Date().toISOString(),
+      eventType,
       participants: [],
       pairs: [],
       splitGroups: false,
@@ -99,6 +103,7 @@ export function HomePage() {
       await upsertEvent(newEvent)
       setEventName('')
       setEventPassword('')
+      setEventType('tournament')
       setShowForm(false)
     } catch {
       alert('Không thể tạo event. Kiểm tra cấu hình Firebase và quyền Firestore.')
@@ -194,7 +199,7 @@ export function HomePage() {
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Danh sách Event</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Tạo và quản lý các mini game pickleball · Đồng bộ qua Firebase
+            Tạo mini game hoặc showmatch tuần · Đồng bộ qua Firebase
           </p>
         </div>
         <button
@@ -210,6 +215,10 @@ export function HomePage() {
         <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Lỗi Firebase: {error}
         </p>
+      )}
+
+      {!loading && (
+        <WeeklyShowmatchHighlight events={events} onOpenEvent={handleManage} />
       )}
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -239,13 +248,51 @@ export function HomePage() {
       {showForm && (
         <div className="mt-6 rounded-2xl border border-green-200 bg-white p-6 shadow-sm">
           <h3 className="font-semibold text-slate-900">Event mới</h3>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEventType('tournament')
+                if (!eventName || eventName === getDefaultShowmatchName()) {
+                  setEventName('')
+                }
+              }}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                eventType === 'tournament'
+                  ? 'bg-green-600 text-white'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Mini game
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEventType('showmatch')
+                if (!eventName.trim()) {
+                  setEventName(getDefaultShowmatchName())
+                }
+              }}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                eventType === 'showmatch'
+                  ? 'bg-fuchsia-600 text-white'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Showmatch tuần
+            </button>
+          </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <input
               type="text"
               value={eventName}
               onChange={(e) => setEventName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              placeholder="Tên event (VD: Mini game thứ 7)"
+              placeholder={
+                eventType === 'showmatch'
+                  ? getDefaultShowmatchName()
+                  : 'Tên event (VD: Mini game thứ 7)'
+              }
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
               autoFocus
             />
@@ -273,6 +320,7 @@ export function HomePage() {
                 setShowForm(false)
                 setEventName('')
                 setEventPassword('')
+                setEventType('tournament')
               }}
               className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
             >
@@ -298,7 +346,18 @@ export function HomePage() {
               className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-green-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-5"
             >
               <div className="min-w-0">
-                <h3 className="font-semibold text-slate-900">{event.name}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold text-slate-900">{event.name}</h3>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      event.eventType === 'showmatch'
+                        ? 'bg-fuchsia-100 text-fuchsia-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}
+                  >
+                    {event.eventType === 'showmatch' ? 'Showmatch' : 'Mini game'}
+                  </span>
+                </div>
                 <p className="mt-1 text-sm text-slate-500 break-words">
                   Mã: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
                   {' · '}
