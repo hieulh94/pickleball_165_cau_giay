@@ -185,23 +185,14 @@ export function HomePage() {
   if (!isFirebaseConfigured()) {
     return (
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Danh sách Event</h2>
-        <div className="mt-6">
-          <FirebaseSetupNotice />
-        </div>
+        <FirebaseSetupNotice />
       </div>
     )
   }
 
   return (
     <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Danh sách Event</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Tạo mini game hoặc showmatch tuần · Đồng bộ qua Firebase
-          </p>
-        </div>
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={() => setShowForm(true)}
