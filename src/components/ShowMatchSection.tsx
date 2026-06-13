@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CollapsibleSection } from './CollapsibleSection'
+import { PlayerNameInput } from './PlayerNameInput'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
 import { getPairColor } from '../lib/pairColors'
 import {
@@ -394,18 +395,16 @@ export function ShowMatchSection({
             <div className="rounded-xl border border-fuchsia-200 bg-white p-3">
               <p className="text-xs font-semibold text-fuchsia-900">Cặp 1</p>
               <div className="mt-2 space-y-2">
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair1Player1}
-                  onChange={(e) => setPair1Player1(e.target.value)}
-                  placeholder="Người chơi 1"
+                  onChange={setPair1Player1}
+                  placeholder="Chọn hoặc nhập người chơi 1"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair1Player2}
-                  onChange={(e) => setPair1Player2(e.target.value)}
-                  placeholder="Người chơi 2"
+                  onChange={setPair1Player2}
+                  placeholder="Chọn hoặc nhập người chơi 2"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
               </div>
@@ -414,25 +413,23 @@ export function ShowMatchSection({
             <div className="rounded-xl border border-fuchsia-200 bg-white p-3">
               <p className="text-xs font-semibold text-fuchsia-900">Cặp 2</p>
               <div className="mt-2 space-y-2">
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair2Player1}
-                  onChange={(e) => setPair2Player1(e.target.value)}
-                  placeholder="Người chơi 1"
+                  onChange={setPair2Player1}
+                  placeholder="Chọn hoặc nhập người chơi 1"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair2Player2}
-                  onChange={(e) => setPair2Player2(e.target.value)}
-                  placeholder="Người chơi 2"
+                  onChange={setPair2Player2}
+                  placeholder="Chọn hoặc nhập người chơi 2"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
               </div>
             </div>
           </div>
           <p className="text-xs text-slate-500">
-            Nhập tên trực tiếp — cùng một người có thể tham gia nhiều trận khác nhau.
+            Chọn từ danh sách CLB hoặc nhập tên — cùng một người có thể tham gia nhiều trận khác nhau.
           </p>
         </div>
 

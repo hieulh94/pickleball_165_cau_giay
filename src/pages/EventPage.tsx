@@ -7,6 +7,8 @@ import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import { AutoSchedulePanel } from '../components/AutoSchedulePanel'
 import { ManualSchedulePanel } from '../components/ManualSchedulePanel'
 import { PlayoffSection } from '../components/PlayoffSection'
+import { PlayerNameInput } from '../components/PlayerNameInput'
+import { PlayerPickerDialog } from '../components/PlayerPickerDialog'
 import { ResultDialog } from '../components/ResultDialog'
 import {
   applyGroupsToPairs,
@@ -27,6 +29,10 @@ import {
 import { isFirebaseConfigured } from '../lib/firebase'
 import { subscribeEvent, upsertEvent } from '../lib/storage'
 import { calculateStandings, hasCompletedMatches } from '../lib/standings'
+import {
+  formatContributionAmount,
+  parseContributionAmountInput,
+} from '../lib/contributionMoney'
 import {
   CollapsibleSection,
   DEFAULT_SECTION_VISIBILITY,
@@ -115,7 +121,9 @@ export function EventPage() {
   const [event, setEvent] = useState<PickleballEvent | null>(null)
   const [loading, setLoading] = useState(isFirebaseConfigured())
   const [error, setError] = useState<string | null>(null)
-  const [name, setName] = useState('')
+  const [participantPickerOpen, setParticipantPickerOpen] = useState(false)
+  const [contributionEditing, setContributionEditing] = useState(false)
+  const [contributionDraft, setContributionDraft] = useState<Record<string, string>>({})
   const [skillLevel, setSkillLevel] = useState<SkillLevel>(1)
   const [courtInput, setCourtInput] = useState('')
   const [manualPlayer1Name, setManualPlayer1Name] = useState('')
@@ -161,6 +169,7 @@ export function EventPage() {
       schedule: false,
       standings: false,
       playoffs: false,
+      contribution: false,
     })
   }
 
@@ -195,6 +204,20 @@ export function EventPage() {
 
     setAccessGranted(isEventAccessGranted(id))
   }, [id, event])
+
+  useEffect(() => {
+    if (!event) return
+
+    const draft: Record<string, string> = {}
+    for (const participant of event.participants) {
+      const saved = event.participantContributions?.[participant.id]
+      draft[participant.id] = saved && saved > 0 ? String(saved) : '0'
+    }
+    setContributionDraft(draft)
+
+    const hasSaved = Object.values(event.participantContributions ?? {}).some((amount) => amount > 0)
+    setContributionEditing(!hasSaved)
+  }, [event?.id, event?.participants, event?.participantContributions])
 
   const finishRandomWheel = useCallback(() => {
     setRandomWheelSession(null)
@@ -392,9 +415,15 @@ export function EventPage() {
     return <ShowMatchEventPage event={event} onPersist={persist} />
   }
 
-  const addParticipant = () => {
-    const trimmed = name.trim()
+  const addParticipant = (rawName: string) => {
+    const trimmed = rawName.trim()
     if (!trimmed) return
+
+    const normalized = normalizeParticipantName(trimmed)
+    if (event.participants.some((p) => normalizeParticipantName(p.name) === normalized)) {
+      alert('Người chơi này đã có trong danh sách.')
+      return
+    }
 
     const participant: Participant = {
       id: crypto.randomUUID(),
@@ -406,7 +435,6 @@ export function EventPage() {
       ...event,
       participants: [...event.participants, participant],
     })
-    setName('')
   }
 
   const doRemoveParticipant = () => {
@@ -817,8 +845,43 @@ export function EventPage() {
 
   const availableSections: SectionKey[] =
     groupMatches.length > 0
-      ? ['participants', 'pairs', 'schedule', 'standings', 'playoffs']
-      : ['participants', 'pairs', 'schedule']
+      ? ['participants', 'pairs', 'schedule', 'standings', 'contribution', 'playoffs']
+      : ['participants', 'pairs', 'schedule', 'contribution']
+
+  const savedContributionTotal = event.participants.reduce((sum, participant) => {
+    return sum + (event.participantContributions?.[participant.id] ?? 0)
+  }, 0)
+
+  const draftContributionTotal = event.participants.reduce((sum, participant) => {
+    return sum + parseContributionAmountInput(contributionDraft[participant.id] ?? '0')
+  }, 0)
+
+  const handleSaveContribution = () => {
+    const participantContributions: Record<string, number> = {}
+    for (const participant of event.participants) {
+      const amount = parseContributionAmountInput(contributionDraft[participant.id] ?? '0')
+      if (amount > 0) {
+        participantContributions[participant.id] = amount
+      }
+    }
+
+    persist({
+      ...event,
+      participantContributions:
+        Object.keys(participantContributions).length > 0 ? participantContributions : undefined,
+    })
+    setContributionEditing(false)
+  }
+
+  const handleEditContribution = () => {
+    const draft: Record<string, string> = {}
+    for (const participant of event.participants) {
+      const saved = event.participantContributions?.[participant.id]
+      draft[participant.id] = saved && saved > 0 ? String(saved) : '0'
+    }
+    setContributionDraft(draft)
+    setContributionEditing(true)
+  }
 
   return (
     <div>
@@ -884,20 +947,12 @@ export function EventPage() {
 
       <CollapsibleSection
         title="Người tham gia"
-        description="Nhập tên và trình độ (1 hoặc 2)"
+        description="Chọn từ danh sách CLB hoặc thêm tên mới, kèm trình độ (1 hoặc 2)"
         visible={sectionVisibility.participants}
         onToggle={() => toggleSection('participants')}
         className="mt-6"
       >
         <div className="flex flex-wrap gap-3">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
-            placeholder="Tên người chơi"
-            className="min-w-[200px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-          />
           <select
             value={skillLevel}
             onChange={(e) => setSkillLevel(Number(e.target.value) as SkillLevel)}
@@ -908,42 +963,46 @@ export function EventPage() {
           </select>
           <button
             type="button"
-            onClick={addParticipant}
+            onClick={() => setParticipantPickerOpen(true)}
             className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
           >
-            Thêm
+            + Chọn người chơi
           </button>
         </div>
 
         {event.participants.length > 0 ? (
-          <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-100">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {event.participants.map((p) => (
-              <li
+              <div
                 key={p.id}
-                className="flex items-center justify-between px-4 py-3"
+                className="flex min-w-0 items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm"
               >
-                <span className="text-sm">
-                  <span className="font-medium text-slate-900">{p.name}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900" title={p.name}>
+                    {p.name}
+                  </p>
                   {p.isManualEntry && manualEntryOrderById.has(p.id) ? (
-                    <span className="ml-2 rounded-full border border-violet-400 bg-violet-200 px-2 py-0.5 text-xs font-bold text-violet-900">
-                      Trình tự chọn {manualEntryOrderById.get(p.id)}
+                    <span className="mt-1 inline-block rounded-full border border-violet-400 bg-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-900">
+                      TT {manualEntryOrderById.get(p.id)}
                     </span>
                   ) : !p.isManualEntry ? (
-                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                      Trình độ {p.skillLevel}
+                    <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800">
+                      TĐ{p.skillLevel}
                     </span>
                   ) : null}
-                </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setParticipantToDelete(p.id)}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-base font-medium leading-none text-slate-600 hover:border-slate-400 hover:bg-slate-200 hover:text-slate-800"
+                  title="Xóa"
+                  aria-label={`Xóa ${p.name}`}
                 >
-                  Xóa
+                  ×
                 </button>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         ) : (
           <p className="text-sm text-slate-400">Chưa có người tham gia.</p>
         )}
@@ -995,20 +1054,18 @@ export function EventPage() {
         <div className="mt-4 rounded-xl border-2 border-violet-300 bg-violet-50 p-4">
           <p className="text-sm font-bold text-violet-900">✋ Hoặc ghép tay cặp đôi</p>
           <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-            <input
-              type="text"
+            <PlayerNameInput
               value={manualPlayer1Name}
-              onChange={(e) => setManualPlayer1Name(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-              placeholder="Nhập tên người chơi 1"
+              onChange={setManualPlayer1Name}
+              placeholder="Chọn hoặc nhập người chơi 1"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
-            <input
-              type="text"
+            <PlayerNameInput
               value={manualPlayer2Name}
-              onChange={(e) => setManualPlayer2Name(e.target.value)}
+              onChange={setManualPlayer2Name}
               onKeyDown={(e) => e.key === 'Enter' && handleAddManualPair()}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-              placeholder="Nhập tên người chơi 2"
+              placeholder="Chọn hoặc nhập người chơi 2"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
             <button
               type="button"
@@ -1337,6 +1394,94 @@ export function EventPage() {
         </CollapsibleSection>
       )}
 
+      <CollapsibleSection
+        title="Tiền cống hiến"
+        description="Nhập số tiền từng người nộp — dùng để tính bảng xếp hạng cống hiến (BXH)"
+        visible={sectionVisibility.contribution}
+        onToggle={() => toggleSection('contribution')}
+        className="mt-6"
+      >
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+          {event.participants.length === 0 ? (
+            <p className="text-sm text-slate-500">Thêm người tham gia trước khi nhập tiền cống hiến.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-emerald-900">
+                  {event.participants.length} người tham gia
+                </p>
+                {contributionEditing ? (
+                  <button
+                    type="button"
+                    onClick={handleSaveContribution}
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                  >
+                    Lưu
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleEditContribution}
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Chỉnh sửa
+                  </button>
+                )}
+              </div>
+
+              <ul className="mt-4 divide-y divide-emerald-100 overflow-hidden rounded-xl border border-emerald-100 bg-white">
+                {event.participants.map((participant) => {
+                  const savedAmount = event.participantContributions?.[participant.id] ?? 0
+                  return (
+                    <li
+                      key={participant.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-900">
+                          {participant.name}
+                        </p>
+                        {!contributionEditing && (
+                          <p className="text-xs text-slate-500">Trình độ {participant.skillLevel}</p>
+                        )}
+                      </div>
+                      {contributionEditing ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={contributionDraft[participant.id] ?? '0'}
+                          onChange={(e) =>
+                            setContributionDraft((prev) => ({
+                              ...prev,
+                              [participant.id]: e.target.value,
+                            }))
+                          }
+                          className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-right text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                        />
+                      ) : (
+                        <span className="shrink-0 text-sm font-semibold text-emerald-800">
+                          {formatContributionAmount(savedAmount)}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+
+              <p className="mt-4 text-sm font-semibold text-emerald-900">
+                Tổng thu:{' '}
+                {formatContributionAmount(
+                  contributionEditing ? draftContributionTotal : savedContributionTotal,
+                )}
+              </p>
+              <p className="mt-1 text-xs text-emerald-800">
+                Số tiền &gt; 0 của mỗi người sẽ được cộng vào BXH cống hiến.
+              </p>
+            </>
+          )}
+        </div>
+      </CollapsibleSection>
+
       {groupMatches.length > 0 && event.courts.length > 0 && event.pairs.length >= 2 && (
         <CollapsibleSection
           title="Vòng loại trực tiếp"
@@ -1382,6 +1527,13 @@ export function EventPage() {
         onSubmit={(s1, s2) => {
           if (selectedMatch) handleUpdateResult(selectedMatch.id, s1, s2)
         }}
+      />
+
+      <PlayerPickerDialog
+        open={participantPickerOpen}
+        excludedNames={event.participants.map((p) => p.name)}
+        onClose={() => setParticipantPickerOpen(false)}
+        onSelect={addParticipant}
       />
 
       <ConfirmDialog

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
+import type { LayoutOutletContext } from '../components/Layout'
 import { WeeklyShowmatchHighlight } from '../components/WeeklyShowmatchHighlight'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { grantEventAccess } from '../lib/eventAccess'
@@ -10,8 +11,12 @@ import { getDefaultShowmatchName } from '../lib/showmatch'
 import { deleteEvent, subscribeEvents, upsertEvent } from '../lib/storage'
 import type { EventType, PickleballEvent } from '../types'
 
+const EVENTS_PAGE_SIZE = 10
+type EventListFilter = 'all' | EventType
+
 export function HomePage() {
   const navigate = useNavigate()
+  const { createRequest } = useOutletContext<LayoutOutletContext>()
   const [events, setEvents] = useState<PickleballEvent[]>([])
   const [loading, setLoading] = useState(isFirebaseConfigured())
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +24,6 @@ export function HomePage() {
   const [eventName, setEventName] = useState('')
   const [eventPassword, setEventPassword] = useState('')
   const [eventType, setEventType] = useState<EventType>('tournament')
-  const [joinCode, setJoinCode] = useState('')
   const [saving, setSaving] = useState(false)
   const [codeDialogOpen, setCodeDialogOpen] = useState(false)
   const [codeInput, setCodeInput] = useState('')
@@ -27,6 +31,8 @@ export function HomePage() {
   const [pendingEvent, setPendingEvent] = useState<PickleballEvent | null>(null)
   const [pendingAction, setPendingAction] = useState<'join' | 'manage' | 'delete' | null>(null)
   const [deleteConfirmEvent, setDeleteConfirmEvent] = useState<PickleballEvent | null>(null)
+  const [listFilter, setListFilter] = useState<EventListFilter>('all')
+  const [page, setPage] = useState(1)
 
   const normalizeCode = (value: string) => value.trim().toUpperCase().replace(/\s+/g, '')
   const getEventCode = (event: PickleballEvent) => normalizeCode(event.accessCode)
@@ -78,6 +84,35 @@ export function HomePage() {
     return unsubscribe
   }, [])
 
+  const filteredEvents = useMemo(() => {
+    if (listFilter === 'all') return events
+    return events.filter((event) => event.eventType === listFilter)
+  }, [events, listFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+
+  const paginatedEvents = useMemo(() => {
+    const start = (currentPage - 1) * EVENTS_PAGE_SIZE
+    return filteredEvents.slice(start, start + EVENTS_PAGE_SIZE)
+  }, [filteredEvents, currentPage])
+
+  useEffect(() => {
+    setPage(1)
+  }, [listFilter])
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages)
+    }
+  }, [page, totalPages])
+
+  useEffect(() => {
+    if (createRequest > 0 && isFirebaseConfigured()) {
+      setShowForm(true)
+    }
+  }, [createRequest])
+
   const handleCreate = async () => {
     const name = eventName.trim()
     const password = eventPassword
@@ -110,24 +145,6 @@ export function HomePage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleJoinByCode = () => {
-    const code = normalizeCode(joinCode)
-    if (!code) return
-
-    const matched = events.find((event) => normalizeCode(event.accessCode) === code)
-    if (!matched) {
-      alert('Không tìm thấy event với mã này.')
-      return
-    }
-
-    if (getEventPassword(matched)) {
-      openCodeDialog(matched, 'join')
-      return
-    }
-
-    navigate(`/event/${matched.id}`)
   }
 
   const handleManage = (event: PickleballEvent) => {
@@ -192,16 +209,6 @@ export function HomePage() {
 
   return (
     <div>
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-700 sm:w-auto"
-        >
-          + Tạo Event
-        </button>
-      </div>
-
       {error && (
         <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Lỗi Firebase: {error}
@@ -211,30 +218,6 @@ export function HomePage() {
       {!loading && (
         <WeeklyShowmatchHighlight events={events} onOpenEvent={handleManage} />
       )}
-
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="font-semibold text-slate-900">Thành viên mới vào xem theo mã</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Nhập mã event do ban tổ chức cung cấp để mở trang event.
-        </p>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <input
-            type="text"
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === 'Enter' && handleJoinByCode()}
-            placeholder="Ví dụ: THU7-CAU1"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase tracking-wide focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:flex-1"
-          />
-          <button
-            type="button"
-            onClick={handleJoinByCode}
-            className="w-full rounded-lg border border-green-600 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 sm:w-auto"
-          >
-            Vào xem
-          </button>
-        </div>
-      </div>
 
       {showForm && (
         <div className="mt-6 rounded-2xl border border-green-200 bg-white p-6 shadow-sm">
@@ -321,7 +304,47 @@ export function HomePage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-4">
+      <div className="mt-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Danh sách event</h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setListFilter('all')}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                listFilter === 'all'
+                  ? 'bg-slate-800 text-white'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              onClick={() => setListFilter('tournament')}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                listFilter === 'tournament'
+                  ? 'bg-green-600 text-white'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Mini game
+            </button>
+            <button
+              type="button"
+              onClick={() => setListFilter('showmatch')}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                listFilter === 'showmatch'
+                  ? 'bg-fuchsia-600 text-white'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Showmatch
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4">
         {loading ? (
           <div className="rounded-2xl border border-slate-200 p-12 text-center">
             <p className="text-slate-500">Đang tải dữ liệu...</p>
@@ -330,8 +353,15 @@ export function HomePage() {
           <div className="rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
             <p className="text-slate-500">Chưa có event nào. Hãy tạo event đầu tiên!</p>
           </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
+            <p className="text-slate-500">
+              Không có event{' '}
+              {listFilter === 'showmatch' ? 'Showmatch' : 'Mini game'} nào.
+            </p>
+          </div>
         ) : (
-          events.map((event) => (
+          paginatedEvents.map((event) => (
             <div
               key={event.id}
               className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-green-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-5"
@@ -385,6 +415,38 @@ export function HomePage() {
               </div>
             </div>
           ))
+        )}
+        </div>
+
+        {!loading && filteredEvents.length > EVENTS_PAGE_SIZE && (
+          <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+            <p className="text-sm text-slate-500">
+              Hiển thị {(currentPage - 1) * EVENTS_PAGE_SIZE + 1}–
+              {Math.min(currentPage * EVENTS_PAGE_SIZE, filteredEvents.length)} trong{' '}
+              {filteredEvents.length} event
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Trước
+              </button>
+              <span className="text-sm text-slate-600">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -57,7 +57,13 @@ export function CollapsibleSection({
   )
 }
 
-export type SectionKey = 'participants' | 'pairs' | 'schedule' | 'standings' | 'playoffs'
+export type SectionKey =
+  | 'participants'
+  | 'pairs'
+  | 'schedule'
+  | 'standings'
+  | 'playoffs'
+  | 'contribution'
 
 export const SECTION_LABELS: Record<SectionKey, string> = {
   participants: 'Người tham gia',
@@ -65,6 +71,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   schedule: 'Lịch thi đấu',
   standings: 'Bảng xếp hạng',
   playoffs: 'Vòng loại trực tiếp',
+  contribution: 'Tiền cống hiến',
 }
 
 export const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
@@ -72,7 +79,8 @@ export const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {
   pairs: true,
   schedule: true,
   standings: true,
-  playoffs: true,
+  playoffs: false,
+  contribution: true,
 }
 
 interface SectionToggleBarProps {
@@ -91,7 +99,7 @@ export function SectionToggleBar({
   availableSections,
 }: SectionToggleBarProps) {
   return (
-    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="sticky top-[4.5rem] z-40 mt-4 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
         Ẩn / Hiện danh mục
       </p>

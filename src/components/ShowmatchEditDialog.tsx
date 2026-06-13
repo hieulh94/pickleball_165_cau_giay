@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { PlayerNameInput } from './PlayerNameInput'
 import { scheduledAtToDateTimeInputs, toScheduledISO } from '../lib/showmatch'
 import { getPairPlayerNames, normalizeParticipantName } from '../lib/showmatchParticipants'
 import type { Match, Pair, Participant } from '../types'
@@ -135,18 +136,16 @@ export function ShowmatchEditDialog({
             <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/40 p-3">
               <p className="text-xs font-semibold text-fuchsia-900">Cặp 1</p>
               <div className="mt-2 space-y-2">
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair1Player1}
-                  onChange={(e) => setPair1Player1(e.target.value)}
-                  placeholder="Người chơi 1"
+                  onChange={setPair1Player1}
+                  placeholder="Chọn hoặc nhập người chơi 1"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair1Player2}
-                  onChange={(e) => setPair1Player2(e.target.value)}
-                  placeholder="Người chơi 2"
+                  onChange={setPair1Player2}
+                  placeholder="Chọn hoặc nhập người chơi 2"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
               </div>
@@ -155,18 +154,16 @@ export function ShowmatchEditDialog({
             <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/40 p-3">
               <p className="text-xs font-semibold text-fuchsia-900">Cặp 2</p>
               <div className="mt-2 space-y-2">
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair2Player1}
-                  onChange={(e) => setPair2Player1(e.target.value)}
-                  placeholder="Người chơi 1"
+                  onChange={setPair2Player1}
+                  placeholder="Chọn hoặc nhập người chơi 1"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
-                <input
-                  type="text"
+                <PlayerNameInput
                   value={pair2Player2}
-                  onChange={(e) => setPair2Player2(e.target.value)}
-                  placeholder="Người chơi 2"
+                  onChange={setPair2Player2}
+                  placeholder="Chọn hoặc nhập người chơi 2"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
                 />
               </div>

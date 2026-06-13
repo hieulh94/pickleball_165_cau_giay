@@ -65,4 +65,6 @@ export interface PickleballEvent {
   groupCount?: number
   courts: number[]
   matches: Match[]
+  /** Số tiền cống hiến từng người (participantId → VND) — mini game, dùng cho BXH */
+  participantContributions?: Record<string, number>
 }

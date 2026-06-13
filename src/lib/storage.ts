@@ -35,6 +35,33 @@ function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
     event.eventType = 'tournament'
   }
 
+  const legacyPerPerson = (event as PickleballEvent & { contributionPerPerson?: number })
+    .contributionPerPerson
+  if (
+    typeof legacyPerPerson === 'number' &&
+    legacyPerPerson > 0 &&
+    Array.isArray(event.participants) &&
+    !event.participantContributions
+  ) {
+    event.participantContributions = Object.fromEntries(
+      event.participants.map((participant) => [participant.id, legacyPerPerson]),
+    )
+  }
+  delete (event as PickleballEvent & { contributionPerPerson?: number }).contributionPerPerson
+
+  if (event.participantContributions) {
+    const cleaned = Object.fromEntries(
+      Object.entries(event.participantContributions).filter(
+        ([, amount]) => typeof amount === 'number' && amount > 0,
+      ),
+    )
+    if (Object.keys(cleaned).length === 0) {
+      delete event.participantContributions
+    } else {
+      event.participantContributions = cleaned
+    }
+  }
+
   if (Array.isArray(event.matches)) {
     event.matches = event.matches.map((match) => migrateMatch(match))
   }

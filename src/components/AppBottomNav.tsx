@@ -1,0 +1,68 @@
+export type FooterTab = 'matches' | 'leaderboard'
+
+interface AppBottomNavProps {
+  activeTab: FooterTab
+  onTabChange: (tab: FooterTab) => void
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-6 w-6"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  )
+}
+
+function TrophyIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className="h-6 w-6"
+      aria-hidden
+    >
+      <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" />
+      <path d="M5 5H3v1a3 3 0 0 0 3 3M19 5h2v1a3 3 0 0 1-3 3" />
+    </svg>
+  )
+}
+
+const TABS: { id: FooterTab; label: string; Icon: typeof CalendarIcon }[] = [
+  { id: 'matches', label: 'Trận đấu', Icon: CalendarIcon },
+  { id: 'leaderboard', label: 'BXH', Icon: TrophyIcon },
+]
+
+export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.06)]">
+      <div className="mx-auto grid max-w-5xl grid-cols-2">
+        {TABS.map(({ id, label, Icon }) => {
+          const active = activeTab === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onTabChange(id)}
+              className={`flex flex-col items-center gap-1 px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                active ? 'text-green-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Icon />
+              {label}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
