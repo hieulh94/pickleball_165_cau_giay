@@ -89,7 +89,7 @@ function Podium({
   const [first, second, third] = standings
 
   return (
-    <div className="flex items-end justify-center gap-2 px-2 pt-4">
+    <div className="flex items-end justify-center gap-2 px-2">
       <PodiumCard row={second} place={2} onSelect={onSelect} />
       <PodiumCard row={first} place={1} onSelect={onSelect} />
       <PodiumCard row={third} place={3} onSelect={onSelect} />
@@ -135,7 +135,7 @@ export function ContributionLeaderboardPanel() {
   if (!isFirebaseConfigured()) return null
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 py-4">
+    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 pb-4">
       {loading ? (
         <p className="mt-10 text-center text-sm text-slate-400">Đang tải bảng xếp hạng...</p>
       ) : standings.length === 0 ? (
@@ -144,7 +144,7 @@ export function ContributionLeaderboardPanel() {
         </p>
       ) : (
         <>
-          <div className="shrink-0 border-b border-slate-200 bg-white pb-3 pt-2">
+          <div className="shrink-0 border-b border-slate-200 bg-white pb-3">
             <Podium standings={standings} onSelect={setSelectedPlayer} />
           </div>
 
