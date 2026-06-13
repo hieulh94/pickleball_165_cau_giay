@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { CreateEventDialog } from '../components/CreateEventDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import type { LayoutOutletContext } from '../components/Layout'
 import { WeeklyShowmatchHighlight } from '../components/WeeklyShowmatchHighlight'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { grantEventAccess } from '../lib/eventAccess'
-import { getDefaultShowmatchName } from '../lib/showmatch'
 import { deleteEvent, subscribeEvents, upsertEvent } from '../lib/storage'
 import type { EventType, PickleballEvent } from '../types'
 
@@ -21,9 +21,6 @@ export function HomePage() {
   const [loading, setLoading] = useState(isFirebaseConfigured())
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [eventName, setEventName] = useState('')
-  const [eventPassword, setEventPassword] = useState('')
-  const [eventType, setEventType] = useState<EventType>('tournament')
   const [saving, setSaving] = useState(false)
   const [codeDialogOpen, setCodeDialogOpen] = useState(false)
   const [codeInput, setCodeInput] = useState('')
@@ -113,10 +110,16 @@ export function HomePage() {
     }
   }, [createRequest])
 
-  const handleCreate = async () => {
-    const name = eventName.trim()
-    const password = eventPassword
-    if (!name || saving) return
+  const handleCreate = async ({
+    name,
+    password,
+    eventType,
+  }: {
+    name: string
+    password: string
+    eventType: EventType
+  }) => {
+    if (saving) return
     const code = generateEventCode()
 
     const newEvent: PickleballEvent = {
@@ -136,9 +139,6 @@ export function HomePage() {
     setSaving(true)
     try {
       await upsertEvent(newEvent)
-      setEventName('')
-      setEventPassword('')
-      setEventType('tournament')
       setShowForm(false)
     } catch {
       alert('Không thể tạo event. Kiểm tra cấu hình Firebase và quyền Firestore.')
@@ -217,91 +217,6 @@ export function HomePage() {
 
       {!loading && (
         <WeeklyShowmatchHighlight events={events} onOpenEvent={handleManage} />
-      )}
-
-      {showForm && (
-        <div className="mt-6 rounded-2xl border border-green-200 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold text-slate-900">Event mới</h3>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEventType('tournament')
-                if (!eventName || eventName === getDefaultShowmatchName()) {
-                  setEventName('')
-                }
-              }}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                eventType === 'tournament'
-                  ? 'bg-green-600 text-white'
-                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              Mini game
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEventType('showmatch')
-                if (!eventName.trim()) {
-                  setEventName(getDefaultShowmatchName())
-                }
-              }}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                eventType === 'showmatch'
-                  ? 'bg-fuchsia-600 text-white'
-                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              Showmatch tuần
-            </button>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <input
-              type="text"
-              value={eventName}
-              onChange={(e) => setEventName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              placeholder={
-                eventType === 'showmatch'
-                  ? getDefaultShowmatchName()
-                  : 'Tên event (VD: Mini game thứ 7)'
-              }
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-              autoFocus
-            />
-            <input
-              type="password"
-              value={eventPassword}
-              onChange={(e) => setEventPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              placeholder="Password event (không bắt buộc)"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-            />
-          </div>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={handleCreate}
-              disabled={saving}
-              className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 sm:w-auto"
-            >
-              {saving ? 'Đang lưu...' : 'Tạo'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false)
-                setEventName('')
-                setEventPassword('')
-                setEventType('tournament')
-              }}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
-            >
-              Hủy
-            </button>
-          </div>
-        </div>
       )}
 
       <div className="mt-8">
@@ -449,6 +364,15 @@ export function HomePage() {
           </div>
         )}
       </div>
+
+      <CreateEventDialog
+        open={showForm}
+        saving={saving}
+        onClose={() => setShowForm(false)}
+        onCreate={(data) => {
+          void handleCreate(data)
+        }}
+      />
 
       <EventCodeDialog
         open={codeDialogOpen}
