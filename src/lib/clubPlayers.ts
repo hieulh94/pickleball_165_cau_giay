@@ -6,7 +6,6 @@ export interface ClubPlayer {
 }
 
 const CLUB_PLAYER_NAMES = [
-  'NH Đoàn',
   'Hiếu LH',
   'Hoa Ngọc Lan',
   'Tùng',
@@ -20,11 +19,12 @@ const CLUB_PLAYER_NAMES = [
   'Trúc Mai',
   'Dohongcuong',
   'Le Ha Chi',
-  'Duy Anh',
   'Đinh Huy',
   'Đức Công Act',
   'Dương Gà',
+  'NH Đoàn',
   'Giangcv',
+  'Duy Anh',
   'Hanhtranvti',
   'Hoàng Cúc',
   'Hoàng Long',
