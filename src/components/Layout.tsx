@@ -14,8 +14,8 @@ export function Layout() {
   const [footerTab, setFooterTab] = useState<FooterTab>('matches')
 
   return (
-    <div className="flex min-h-screen flex-col pb-16">
-      <header className="sticky top-0 z-50 border-b border-green-100 bg-gradient-to-r from-green-700 to-emerald-600 text-white shadow-md">
+    <div className="flex h-dvh flex-col overflow-hidden pb-16">
+      <header className="z-50 shrink-0 border-b border-green-100 bg-gradient-to-r from-green-700 to-emerald-600 text-white shadow-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <Link to="/" className="flex items-center gap-3" onClick={() => setFooterTab('matches')}>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-lg font-bold">
@@ -39,11 +39,11 @@ export function Layout() {
       </header>
 
       {footerTab === 'matches' ? (
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+        <main className="mx-auto w-full max-w-5xl min-h-0 flex-1 overflow-y-auto px-4 py-8">
           <Outlet context={{ createRequest } satisfies LayoutOutletContext} />
         </main>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ContributionLeaderboardPanel />
         </div>
       )}

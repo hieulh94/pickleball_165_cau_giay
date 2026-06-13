@@ -121,3 +121,43 @@ export function calculateContributionStandings(
 
   return assignRanks(rows)
 }
+
+export interface ContributionHistoryEntry {
+  eventId: string
+  eventName: string
+  eventDate: string
+  amount: number
+}
+
+export function getPlayerContributionHistory(
+  events: PickleballEvent[],
+  playerName: string,
+): ContributionHistoryEntry[] {
+  const key = normalizeParticipantName(playerName)
+  const entries: ContributionHistoryEntry[] = []
+
+  for (const event of events) {
+    if (event.eventType === 'showmatch') continue
+    const contributions = event.participantContributions
+    if (!contributions) continue
+
+    const participant = event.participants.find(
+      (p) => normalizeParticipantName(p.name) === key,
+    )
+    if (!participant) continue
+
+    const amount = contributions[participant.id] ?? 0
+    if (amount <= 0) continue
+
+    entries.push({
+      eventId: event.id,
+      eventName: event.name,
+      eventDate: event.createdAt,
+      amount,
+    })
+  }
+
+  return entries.sort(
+    (a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime(),
+  )
+}
