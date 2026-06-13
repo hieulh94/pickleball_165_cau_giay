@@ -48,12 +48,10 @@ const CLUB_PLAYER_NAMES = [
   'Bích Ngọc',
 ] as const
 
-export const CLUB_PLAYERS: ClubPlayer[] = [...CLUB_PLAYER_NAMES]
-  .sort((a, b) => a.localeCompare(b, 'vi'))
-  .map((name) => ({
-    id: normalizeParticipantName(name).replace(/\s+/g, '-'),
-    name,
-  }))
+export const CLUB_PLAYERS: ClubPlayer[] = CLUB_PLAYER_NAMES.map((name) => ({
+  id: normalizeParticipantName(name).replace(/\s+/g, '-'),
+  name,
+}))
 
 export function filterClubPlayers(query: string): ClubPlayer[] {
   const normalized = normalizeParticipantName(query)
