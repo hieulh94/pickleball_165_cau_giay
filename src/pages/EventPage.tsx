@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ContributionDialog } from '../components/ContributionDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
@@ -29,10 +30,6 @@ import {
 import { isFirebaseConfigured } from '../lib/firebase'
 import { subscribeEvent, upsertEvent } from '../lib/storage'
 import { calculateStandings, hasCompletedMatches } from '../lib/standings'
-import {
-  formatContributionAmount,
-  parseContributionAmountInput,
-} from '../lib/contributionMoney'
 import {
   CollapsibleSection,
   DEFAULT_SECTION_VISIBILITY,
@@ -122,8 +119,7 @@ export function EventPage() {
   const [loading, setLoading] = useState(isFirebaseConfigured())
   const [error, setError] = useState<string | null>(null)
   const [participantPickerOpen, setParticipantPickerOpen] = useState(false)
-  const [contributionEditing, setContributionEditing] = useState(false)
-  const [contributionDraft, setContributionDraft] = useState<Record<string, string>>({})
+  const [contributionDialogOpen, setContributionDialogOpen] = useState(false)
   const [skillLevel, setSkillLevel] = useState<SkillLevel>(1)
   const [courtInput, setCourtInput] = useState('')
   const [manualPlayer1Name, setManualPlayer1Name] = useState('')
@@ -204,20 +200,6 @@ export function EventPage() {
 
     setAccessGranted(isEventAccessGranted(id))
   }, [id, event])
-
-  useEffect(() => {
-    if (!event) return
-
-    const draft: Record<string, string> = {}
-    for (const participant of event.participants) {
-      const saved = event.participantContributions?.[participant.id]
-      draft[participant.id] = saved && saved > 0 ? String(saved) : '0'
-    }
-    setContributionDraft(draft)
-
-    const hasSaved = Object.values(event.participantContributions ?? {}).some((amount) => amount > 0)
-    setContributionEditing(!hasSaved)
-  }, [event?.id, event?.participants, event?.participantContributions])
 
   const finishRandomWheel = useCallback(() => {
     setRandomWheelSession(null)
@@ -848,103 +830,83 @@ export function EventPage() {
       ? ['participants', 'pairs', 'schedule', 'standings', 'contribution', 'playoffs']
       : ['participants', 'pairs', 'schedule', 'contribution']
 
-  const savedContributionTotal = event.participants.reduce((sum, participant) => {
-    return sum + (event.participantContributions?.[participant.id] ?? 0)
-  }, 0)
-
-  const draftContributionTotal = event.participants.reduce((sum, participant) => {
-    return sum + parseContributionAmountInput(contributionDraft[participant.id] ?? '0')
-  }, 0)
-
-  const handleSaveContribution = () => {
-    const participantContributions: Record<string, number> = {}
-    for (const participant of event.participants) {
-      const amount = parseContributionAmountInput(contributionDraft[participant.id] ?? '0')
-      if (amount > 0) {
-        participantContributions[participant.id] = amount
-      }
-    }
-
+  const handleSaveContribution = (participantContributions: Record<string, number> | undefined) => {
     persist({
       ...event,
-      participantContributions:
-        Object.keys(participantContributions).length > 0 ? participantContributions : undefined,
+      participantContributions,
     })
-    setContributionEditing(false)
-  }
-
-  const handleEditContribution = () => {
-    const draft: Record<string, string> = {}
-    for (const participant of event.participants) {
-      const saved = event.participantContributions?.[participant.id]
-      draft[participant.id] = saved && saved > 0 ? String(saved) : '0'
-    }
-    setContributionDraft(draft)
-    setContributionEditing(true)
+    setContributionDialogOpen(false)
   }
 
   return (
-    <div>
-      <Link to="/" className="text-sm text-green-600 hover:underline">
-        ← Quay lại danh sách
-      </Link>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 pt-4">
+        <Link to="/" className="text-sm text-green-600 hover:underline">
+          ← Quay lại danh sách
+        </Link>
 
-      <div className="mt-4">
-        {isEditingEventName ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              type="text"
-              value={eventNameInput}
-              onChange={(e) => setEventNameInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveEventName()}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:max-w-md"
-              autoFocus
-            />
-            <div className="flex gap-2">
+        <div className="mt-4">
+          {isEditingEventName ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={eventNameInput}
+                onChange={(e) => setEventNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveEventName()}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:max-w-md"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveEventName}
+                  className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                >
+                  Lưu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingEventName(false)
+                    setEventNameInput('')
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
               <button
                 type="button"
-                onClick={handleSaveEventName}
-                className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                onClick={handleStartEditEventName}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                Lưu
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingEventName(false)
-                  setEventNameInput('')
-                }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Hủy
+                Sửa tên
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
-            <button
-              type="button"
-              onClick={handleStartEditEventName}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Sửa tên
-            </button>
-          </div>
-        )}
-        <p className="mt-1 text-sm text-slate-500">
-          Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
-        </p>
+          )}
+          <p className="mt-1 text-sm text-slate-500">
+            Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
+          </p>
+        </div>
+
+        <SectionToggleBar
+          visibility={sectionVisibility}
+          onToggle={toggleSection}
+          onShowAll={showAllSections}
+          onHideAll={hideAllSections}
+          availableSections={availableSections}
+          dialogSections={['contribution']}
+          onDialogOpen={(key) => {
+            if (key === 'contribution') setContributionDialogOpen(true)
+          }}
+        />
       </div>
 
-      <SectionToggleBar
-        visibility={sectionVisibility}
-        onToggle={toggleSection}
-        onShowAll={showAllSections}
-        onHideAll={hideAllSections}
-        availableSections={availableSections}
-      />
-
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
       <CollapsibleSection
         title="Người tham gia"
         description="Chọn từ danh sách CLB hoặc thêm tên mới, kèm trình độ (1 hoặc 2)"
@@ -1057,12 +1019,14 @@ export function EventPage() {
             <PlayerNameInput
               value={manualPlayer1Name}
               onChange={setManualPlayer1Name}
+              extraNames={event.participants.map((participant) => participant.name)}
               placeholder="Chọn hoặc nhập người chơi 1"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
             />
             <PlayerNameInput
               value={manualPlayer2Name}
               onChange={setManualPlayer2Name}
+              extraNames={event.participants.map((participant) => participant.name)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddManualPair()}
               placeholder="Chọn hoặc nhập người chơi 2"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
@@ -1394,94 +1358,6 @@ export function EventPage() {
         </CollapsibleSection>
       )}
 
-      <CollapsibleSection
-        title="Tiền cống hiến"
-        description="Nhập số tiền từng người nộp — dùng để tính bảng xếp hạng cống hiến (BXH)"
-        visible={sectionVisibility.contribution}
-        onToggle={() => toggleSection('contribution')}
-        className="mt-6"
-      >
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-          {event.participants.length === 0 ? (
-            <p className="text-sm text-slate-500">Thêm người tham gia trước khi nhập tiền cống hiến.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-emerald-900">
-                  {event.participants.length} người tham gia
-                </p>
-                {contributionEditing ? (
-                  <button
-                    type="button"
-                    onClick={handleSaveContribution}
-                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                  >
-                    Lưu
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleEditContribution}
-                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Chỉnh sửa
-                  </button>
-                )}
-              </div>
-
-              <ul className="mt-4 divide-y divide-emerald-100 overflow-hidden rounded-xl border border-emerald-100 bg-white">
-                {event.participants.map((participant) => {
-                  const savedAmount = event.participantContributions?.[participant.id] ?? 0
-                  return (
-                    <li
-                      key={participant.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-900">
-                          {participant.name}
-                        </p>
-                        {!contributionEditing && (
-                          <p className="text-xs text-slate-500">Trình độ {participant.skillLevel}</p>
-                        )}
-                      </div>
-                      {contributionEditing ? (
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={contributionDraft[participant.id] ?? '0'}
-                          onChange={(e) =>
-                            setContributionDraft((prev) => ({
-                              ...prev,
-                              [participant.id]: e.target.value,
-                            }))
-                          }
-                          className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-right text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                        />
-                      ) : (
-                        <span className="shrink-0 text-sm font-semibold text-emerald-800">
-                          {formatContributionAmount(savedAmount)}
-                        </span>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-
-              <p className="mt-4 text-sm font-semibold text-emerald-900">
-                Tổng thu:{' '}
-                {formatContributionAmount(
-                  contributionEditing ? draftContributionTotal : savedContributionTotal,
-                )}
-              </p>
-              <p className="mt-1 text-xs text-emerald-800">
-                Số tiền &gt; 0 của mỗi người sẽ được cộng vào BXH cống hiến.
-              </p>
-            </>
-          )}
-        </div>
-      </CollapsibleSection>
-
       {groupMatches.length > 0 && event.courts.length > 0 && event.pairs.length >= 2 && (
         <CollapsibleSection
           title="Vòng loại trực tiếp"
@@ -1503,6 +1379,16 @@ export function EventPage() {
           />
         </CollapsibleSection>
       )}
+
+      </div>
+
+      <ContributionDialog
+        open={contributionDialogOpen}
+        participants={event.participants}
+        participantContributions={event.participantContributions}
+        onClose={() => setContributionDialogOpen(false)}
+        onSave={handleSaveContribution}
+      />
 
       <ResultDialog
         open={!!selectedMatch}

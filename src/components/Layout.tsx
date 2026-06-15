@@ -10,6 +10,7 @@ export type LayoutOutletContext = {
 export function Layout() {
   const location = useLocation()
   const isHome = location.pathname === '/'
+  const isEventDetail = location.pathname.startsWith('/event/')
   const [createRequest, setCreateRequest] = useState(0)
   const [footerTab, setFooterTab] = useState<FooterTab>('matches')
 
@@ -39,7 +40,11 @@ export function Layout() {
       </header>
 
       {footerTab === 'matches' ? (
-        <main className="mx-auto w-full max-w-5xl min-h-0 flex-1 overflow-y-auto px-4 py-8">
+        <main
+          className={`mx-auto w-full max-w-5xl min-h-0 flex-1 px-4 ${
+            isEventDetail ? 'flex flex-col overflow-hidden' : 'overflow-y-auto py-8'
+          }`}
+        >
           <Outlet context={{ createRequest } satisfies LayoutOutletContext} />
         </main>
       ) : (

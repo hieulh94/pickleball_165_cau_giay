@@ -89,6 +89,8 @@ interface SectionToggleBarProps {
   onShowAll: () => void
   onHideAll: () => void
   availableSections: SectionKey[]
+  dialogSections?: SectionKey[]
+  onDialogOpen?: (key: SectionKey) => void
 }
 
 export function SectionToggleBar({
@@ -97,24 +99,29 @@ export function SectionToggleBar({
   onShowAll,
   onHideAll,
   availableSections,
+  dialogSections = [],
+  onDialogOpen,
 }: SectionToggleBarProps) {
   return (
-    <div className="sticky top-[4.5rem] z-40 mt-4 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm">
+    <div className="z-30 mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
         Ẩn / Hiện danh mục
       </p>
       <div className="flex flex-wrap gap-2">
         {availableSections.map((key) => {
+          const isDialog = dialogSections.includes(key)
           const isVisible = visibility[key]
           return (
             <button
               key={key}
               type="button"
-              onClick={() => onToggle(key)}
+              onClick={() => (isDialog ? onDialogOpen?.(key) : onToggle(key))}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                isVisible
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'border border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                isDialog
+                  ? 'border border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  : isVisible
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'border border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}
             >
               {SECTION_LABELS[key]}

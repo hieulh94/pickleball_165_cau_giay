@@ -206,12 +206,13 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
   }
 
   return (
-    <div>
-      <Link to="/" className="text-sm text-green-600 hover:underline">
-        ← Quay lại danh sách
-      </Link>
+    <div className="flex min-h-0 flex-1 flex-col pt-4">
+      <div className="shrink-0">
+        <Link to="/" className="text-sm text-green-600 hover:underline">
+          ← Quay lại danh sách
+        </Link>
 
-      <div className="mt-4">
+        <div className="mt-4">
         {isEditingEventName ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <input
@@ -261,7 +262,9 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
           Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
         </p>
       </div>
+      </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
       <div className="mt-6">
         <ShowMatchSection
           pairs={event.pairs}
@@ -275,6 +278,7 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
           onEditMatch={setEditingMatch}
           onUpdateResult={setSelectedMatch}
         />
+      </div>
       </div>
 
       <ConfirmDialog
