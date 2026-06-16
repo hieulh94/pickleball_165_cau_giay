@@ -840,12 +840,12 @@ export function EventPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 pt-4">
-        <Link to="/" className="text-sm text-green-600 hover:underline">
+      <div className="shrink-0 pt-2 sm:pt-4">
+        <Link to="/" className="text-xs text-green-600 hover:underline sm:text-sm">
           ← Quay lại danh sách
         </Link>
 
-        <div className="mt-4">
+        <div className="mt-2 sm:mt-4">
           {isEditingEventName ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
@@ -877,8 +877,8 @@ export function EventPage() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h2 className="text-lg font-bold text-slate-900 sm:text-2xl">{event.name}</h2>
               <button
                 type="button"
                 onClick={handleStartEditEventName}
@@ -888,7 +888,7 @@ export function EventPage() {
               </button>
             </div>
           )}
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-500 sm:mt-1 sm:text-sm">
             Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
           </p>
         </div>
