@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ShowmatchEditDialog } from '../components/ShowmatchEditDialog'
 import { ShowmatchResultDialog } from '../components/ShowmatchResultDialog'
 import { ShowMatchSection } from '../components/ShowMatchSection'
+import { CompactEventHeader } from '../components/ui/CompactEventHeader'
 import { canEditShowmatchInfo } from '../lib/showmatch'
 import { filterShowMatches } from '../lib/matches'
 import { getPairLabel } from '../lib/pairing'
@@ -12,6 +13,7 @@ import {
   pruneOrphanShowmatchPairs,
 } from '../lib/showmatchParticipants'
 import { countGamesWon, isBo3Decided } from '../lib/showmatchScoring'
+import { deleteEvent } from '../lib/storage'
 import type { Match, PickleballEvent, ShowmatchGame } from '../types'
 
 interface ShowMatchEventPageProps {
@@ -20,8 +22,10 @@ interface ShowMatchEventPageProps {
 }
 
 export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps) {
+  const navigate = useNavigate()
   const [isEditingEventName, setIsEditingEventName] = useState(false)
   const [eventNameInput, setEventNameInput] = useState('')
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [matchToDelete, setMatchToDelete] = useState<string | null>(null)
@@ -205,87 +209,72 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
     setIsEditingEventName(false)
   }
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col pt-4">
-      <div className="shrink-0">
-        <Link to="/" className="text-sm text-green-600 hover:underline">
-          ← Quay lại danh sách
-        </Link>
+  const handleConfirmDeleteEvent = async () => {
+    setDeleteConfirmOpen(false)
+    try {
+      await deleteEvent(event.id)
+      navigate('/')
+    } catch {
+      alert('Không thể xóa event. Kiểm tra kết nối và quyền Firestore.')
+    }
+  }
 
-        <div className="mt-4">
-        {isEditingEventName ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              type="text"
-              value={eventNameInput}
-              onChange={(e) => setEventNameInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveEventName()}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:max-w-md"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleSaveEventName}
-                className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-              >
-                Lưu
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingEventName(false)
-                  setEventNameInput('')
-                }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Hủy
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-2xl font-bold text-slate-900">{event.name}</h2>
-            <span className="rounded-full bg-fuchsia-100 px-2.5 py-0.5 text-xs font-bold text-fuchsia-800">
-              Showmatch
-            </span>
-            <button
-              type="button"
-              onClick={handleStartEditEventName}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Sửa tên
-            </button>
-          </div>
-        )}
-        <p className="mt-1 text-sm text-slate-500">
-          Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
-        </p>
-      </div>
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 pb-2 pt-1">
+        <CompactEventHeader
+          name={event.name}
+          accessCode={event.accessCode}
+          badge={{
+            label: 'Showmatch',
+            className: 'bg-primary-50 text-primary-700',
+          }}
+          isEditingName={isEditingEventName}
+          nameInput={eventNameInput}
+          onNameInputChange={setEventNameInput}
+          onStartRename={handleStartEditEventName}
+          onSaveName={handleSaveEventName}
+          onCancelRename={() => {
+            setIsEditingEventName(false)
+            setEventNameInput('')
+          }}
+          onDelete={() => setDeleteConfirmOpen(true)}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
-      <div className="mt-6">
-        <ShowMatchSection
-          pairs={event.pairs}
-          participants={event.participants}
-          matches={showMatches}
-          pairNumberById={pairNumberById}
-          createFormVisible={createFormVisible}
-          onCreateFormToggle={() => setCreateFormVisible((v) => !v)}
-          onCreateMatch={handleCreateShowMatch}
-          onDeleteMatch={handleDeleteShowMatch}
-          onEditMatch={setEditingMatch}
-          onUpdateResult={setSelectedMatch}
-        />
+        <div className="pt-2">
+          <ShowMatchSection
+            pairs={event.pairs}
+            participants={event.participants}
+            matches={showMatches}
+            pairNumberById={pairNumberById}
+            createFormVisible={createFormVisible}
+            onCreateFormToggle={() => setCreateFormVisible((v) => !v)}
+            onCreateMatch={handleCreateShowMatch}
+            onDeleteMatch={handleDeleteShowMatch}
+            onEditMatch={setEditingMatch}
+            onUpdateResult={setSelectedMatch}
+          />
+        </div>
       </div>
-      </div>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Xóa event"
+        message={`Bạn có chắc muốn xóa "${event.name}"? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDeleteEvent}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
 
       <ConfirmDialog
         open={!!matchToDelete}
         title="Xóa trận"
         message={deleteMatchMessage}
         confirmLabel="Xóa"
+        confirmVariant="danger"
         onConfirm={confirmDeleteShowMatch}
         onCancel={() => setMatchToDelete(null)}
       />

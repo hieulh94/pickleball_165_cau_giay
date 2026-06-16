@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ContributionDialog } from '../components/ContributionDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
@@ -28,16 +28,20 @@ import {
   isEventAccessGranted,
 } from '../lib/eventAccess'
 import { isFirebaseConfigured } from '../lib/firebase'
-import { subscribeEvent, upsertEvent } from '../lib/storage'
+import { deleteEvent, subscribeEvent, upsertEvent } from '../lib/storage'
 import { calculateStandings, hasCompletedMatches } from '../lib/standings'
 import {
   CollapsibleSection,
   DEFAULT_SECTION_VISIBILITY,
-  SectionToggleBar,
   type SectionKey,
 } from '../components/CollapsibleSection'
+import { SectionNavBar } from '../components/SectionNavBar'
 import { StandingsContent } from '../components/StandingsSection'
 import { ShowMatchEventPage } from './ShowMatchEventPage'
+import { Button } from '../components/ui/Button'
+import { BackLink } from '../components/ui/BackLink'
+import { CompactEventHeader } from '../components/ui/CompactEventHeader'
+import { selectClassName } from '../components/ui/styles'
 import type { Match, Pair, Participant, PickleballEvent, SkillLevel } from '../types'
 
 function isManualPair(pair: Pair) {
@@ -84,7 +88,7 @@ function PairDisplayCard({
 }) {
   if (!pair || pairNumber < 1) {
     return (
-      <div className="flex h-full min-h-[5.5rem] w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+      <div className="flex h-full min-h-[5.5rem] w-full items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-sm text-neutral-400">
         —
       </div>
     )
@@ -149,9 +153,10 @@ export function EventPage() {
   )
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
-  const toggleSection = (key: SectionKey) => {
-    setSectionVisibility((prev) => ({ ...prev, [key]: !prev[key] }))
+  const setSectionVisible = (key: SectionKey, visible: boolean) => {
+    setSectionVisibility((prev) => ({ ...prev, [key]: visible }))
   }
 
   const showAllSections = () => {
@@ -167,6 +172,21 @@ export function EventPage() {
       playoffs: false,
       contribution: false,
     })
+  }
+
+  const handleRequestDeleteEvent = () => {
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleConfirmDeleteEvent = async () => {
+    if (!event) return
+    setDeleteConfirmOpen(false)
+    try {
+      await deleteEvent(event.id)
+      navigate('/')
+    } catch {
+      alert('Không thể xóa event. Kiểm tra kết nối và quyền Firestore.')
+    }
   }
 
   useEffect(() => {
@@ -309,9 +329,7 @@ export function EventPage() {
   if (!isFirebaseConfigured()) {
     return (
       <div>
-        <Link to="/" className="text-sm text-green-600 hover:underline">
-          ← Quay lại danh sách
-        </Link>
+        <BackLink />
         <div className="mt-6">
           <FirebaseSetupNotice />
         </div>
@@ -322,7 +340,7 @@ export function EventPage() {
   if (loading) {
     return (
       <div className="text-center">
-        <p className="text-slate-500">Đang tải event...</p>
+        <p className="text-neutral-500">Đang tải event...</p>
       </div>
     )
   }
@@ -331,9 +349,7 @@ export function EventPage() {
     return (
       <div className="text-center">
         <p className="text-red-600">Lỗi Firebase: {error}</p>
-        <Link to="/" className="mt-4 inline-block text-green-600 hover:underline">
-          ← Quay lại
-        </Link>
+        <BackLink className="mt-4 inline-block" />
       </div>
     )
   }
@@ -341,10 +357,8 @@ export function EventPage() {
   if (!event) {
     return (
       <div className="text-center">
-        <p className="text-slate-500">Không tìm thấy event.</p>
-        <Link to="/" className="mt-4 inline-block text-green-600 hover:underline">
-          ← Quay lại
-        </Link>
+        <p className="text-neutral-500">Không tìm thấy event.</p>
+        <BackLink className="mt-4 inline-block" />
       </div>
     )
   }
@@ -364,12 +378,10 @@ export function EventPage() {
   if (!accessGranted && eventRequiresPassword(event.accessPassword)) {
     return (
       <div>
-        <Link to="/" className="text-sm text-green-600 hover:underline">
-          ← Quay lại danh sách
-        </Link>
+        <BackLink />
         <div className="mt-16 text-center">
-          <h2 className="text-xl font-bold text-slate-900">{event.name}</h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <h2 className="text-xl font-bold text-neutral-900">{event.name}</h2>
+          <p className="mt-2 text-sm text-neutral-500">
             Event này yêu cầu mật khẩu để xem.
           </p>
         </div>
@@ -839,97 +851,54 @@ export function EventPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 pt-2 sm:pt-4">
-        <Link to="/" className="text-xs text-green-600 hover:underline sm:text-sm">
-          ← Quay lại danh sách
-        </Link>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 pb-2 pt-1">
+        <CompactEventHeader
+          name={event.name}
+          accessCode={event.accessCode}
+          isEditingName={isEditingEventName}
+          nameInput={eventNameInput}
+          onNameInputChange={setEventNameInput}
+          onStartRename={handleStartEditEventName}
+          onSaveName={handleSaveEventName}
+          onCancelRename={() => {
+            setIsEditingEventName(false)
+            setEventNameInput('')
+          }}
+          onDelete={handleRequestDeleteEvent}
+        />
+      </div>
 
-        <div className="mt-2 sm:mt-4">
-          {isEditingEventName ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                type="text"
-                value={eventNameInput}
-                onChange={(e) => setEventNameInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSaveEventName()}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20 sm:max-w-md"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveEventName}
-                  className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-                >
-                  Lưu
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingEventName(false)
-                    setEventNameInput('')
-                  }}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Hủy
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h2 className="text-lg font-bold text-slate-900 sm:text-2xl">{event.name}</h2>
-              <button
-                type="button"
-                onClick={handleStartEditEventName}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Sửa tên
-              </button>
-            </div>
-          )}
-          <p className="mt-0.5 text-xs text-slate-500 sm:mt-1 sm:text-sm">
-            Mã event: <span className="font-semibold text-slate-700">{event.accessCode || '—'}</span>
-          </p>
-        </div>
-
-        <SectionToggleBar
+      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <SectionNavBar
+          availableSections={availableSections}
           visibility={sectionVisibility}
-          onToggle={toggleSection}
+          onSetVisibility={setSectionVisible}
           onShowAll={showAllSections}
           onHideAll={hideAllSections}
-          availableSections={availableSections}
           dialogSections={['contribution']}
           onDialogOpen={(key) => {
             if (key === 'contribution') setContributionDialogOpen(true)
           }}
         />
-      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className="space-y-6 pt-4">
       <CollapsibleSection
+        id="section-participants"
         title="Người tham gia"
         description="Chọn từ danh sách CLB hoặc thêm tên mới, kèm trình độ (1 hoặc 2)"
         visible={sectionVisibility.participants}
-        onToggle={() => toggleSection('participants')}
-        className="mt-6"
       >
         <div className="flex flex-wrap gap-3">
           <select
             value={skillLevel}
             onChange={(e) => setSkillLevel(Number(e.target.value) as SkillLevel)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+            className={selectClassName}
           >
             <option value={1}>Trình độ 1</option>
             <option value={2}>Trình độ 2</option>
           </select>
-          <button
-            type="button"
-            onClick={() => setParticipantPickerOpen(true)}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-          >
-            + Chọn người chơi
-          </button>
+          <Button onClick={() => setParticipantPickerOpen(true)}>+ Chọn người chơi</Button>
         </div>
 
         {event.participants.length > 0 ? (
@@ -937,18 +906,18 @@ export function EventPage() {
             {event.participants.map((p) => (
               <div
                 key={p.id}
-                className="flex min-w-0 items-start justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                className="flex min-w-0 items-start justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900" title={p.name}>
+                  <p className="truncate text-sm font-medium text-neutral-900" title={p.name}>
                     {p.name}
                   </p>
                   {p.isManualEntry && manualEntryOrderById.has(p.id) ? (
-                    <span className="mt-1 inline-block rounded-full border border-violet-400 bg-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-900">
+                    <span className="mt-1 inline-block rounded-full border border-primary-300 bg-primary-100 px-2 py-0.5 text-[10px] font-bold text-primary-800">
                       TT {manualEntryOrderById.get(p.id)}
                     </span>
                   ) : !p.isManualEntry ? (
-                    <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800">
+                    <span className="mt-1 inline-block rounded-full bg-secondary-50 px-2 py-0.5 text-[10px] font-medium text-secondary-700">
                       TĐ{p.skillLevel}
                     </span>
                   ) : null}
@@ -956,7 +925,7 @@ export function EventPage() {
                 <button
                   type="button"
                   onClick={() => setParticipantToDelete(p.id)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-base font-medium leading-none text-slate-600 hover:border-slate-400 hover:bg-slate-200 hover:text-slate-800"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-neutral-100 text-base font-medium leading-none text-neutral-600 hover:border-neutral-400 hover:bg-neutral-200 hover:text-neutral-800"
                   title="Xóa"
                   aria-label={`Xóa ${p.name}`}
                 >
@@ -966,15 +935,15 @@ export function EventPage() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-400">Chưa có người tham gia.</p>
+          <p className="text-sm text-neutral-400">Chưa có người tham gia.</p>
         )}
       </CollapsibleSection>
 
       <CollapsibleSection
+        id="section-pairs"
         title="Cặp đôi"
         description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
-        onToggle={() => toggleSection('pairs')}
         headerExtra={
           <label className="flex cursor-pointer items-center gap-2">
             <input
@@ -999,29 +968,28 @@ export function EventPage() {
                   matches: playoffMatches,
                 })
               }}
-              className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+              className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600"
             />
-            <span className="text-sm font-medium text-slate-700">Chia bảng đấu</span>
+            <span className="text-sm font-medium text-neutral-700">Chia bảng đấu</span>
           </label>
         }
       >
-        <button
-          type="button"
+        <Button
           onClick={requestRandomPairs}
-          className="rounded-lg border-2 border-amber-600 bg-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:bg-amber-600"
+          className="bg-neutral-900 hover:bg-neutral-800"
         >
           🎲 Random cặp đôi
-        </button>
+        </Button>
 
-        <div className="mt-4 rounded-xl border-2 border-violet-300 bg-violet-50 p-4">
-          <p className="text-sm font-bold text-violet-900">✋ Hoặc ghép tay cặp đôi</p>
+        <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50 p-4">
+          <p className="text-sm font-semibold text-primary-800">✋ Hoặc ghép tay cặp đôi</p>
           <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
             <PlayerNameInput
               value={manualPlayer1Name}
               onChange={setManualPlayer1Name}
               extraNames={event.participants.map((participant) => participant.name)}
               placeholder="Chọn hoặc nhập người chơi 1"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
             />
             <PlayerNameInput
               value={manualPlayer2Name}
@@ -1029,18 +997,16 @@ export function EventPage() {
               extraNames={event.participants.map((participant) => participant.name)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddManualPair()}
               placeholder="Chọn hoặc nhập người chơi 2"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
             />
-            <button
-              type="button"
+            <Button
               onClick={handleAddManualPair}
               disabled={!canAddManualPair}
-              className="rounded-lg border-2 border-violet-500 bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-500"
             >
               + Thêm cặp
-            </button>
+            </Button>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-neutral-500">
             Còn {unpairedParticipants.length} người chưa ghép cặp. Có thể nhập tên mới, hệ thống sẽ
             tự thêm người chơi vào danh sách.
           </p>
@@ -1069,7 +1035,7 @@ export function EventPage() {
             {pairsByGroup.map(([group, pairs]) => (
               <div key={group}>
                 {event.splitGroups && (
-                  <h4 className="mb-2 text-sm font-semibold text-green-700">{group}</h4>
+                  <h4 className="mb-2 text-sm font-semibold text-secondary-700">{group}</h4>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pairs.map((pair) => {
@@ -1092,14 +1058,14 @@ export function EventPage() {
       </CollapsibleSection>
 
       <CollapsibleSection
+        id="section-schedule"
         title="Lịch thi đấu"
         description="Thêm sân, rồi tạo lịch tự động hoặc thêm từng trận thủ công"
         visible={sectionVisibility.schedule}
-        onToggle={() => toggleSection('schedule')}
       >
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
               Số sân
             </label>
             <input
@@ -1109,13 +1075,13 @@ export function EventPage() {
               onChange={(e) => setCourtInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addCourt()}
               placeholder="VD: 1, 3, 5"
-              className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
             />
           </div>
           <button
             type="button"
             onClick={addCourt}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
             Thêm sân
           </button>
@@ -1141,7 +1107,7 @@ export function EventPage() {
             ))}
           </div>
         ) : (
-          <p className="mt-4 text-sm text-amber-600">
+          <p className="mt-4 text-sm text-neutral-600">
             Chưa có sân nào. Hãy thêm số sân trước khi tạo lịch.
           </p>
         )}
@@ -1152,7 +1118,7 @@ export function EventPage() {
               type="button"
               onClick={() => toggleScheduleCreateMode('auto')}
               disabled={event.courts.length === 0}
-              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none ${
+              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 disabled:shadow-none ${
                 scheduleCreateMode === 'auto'
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'border border-blue-300 bg-white text-blue-800 hover:bg-blue-50'
@@ -1164,10 +1130,10 @@ export function EventPage() {
               type="button"
               onClick={() => toggleScheduleCreateMode('manual')}
               disabled={event.courts.length === 0}
-              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none ${
+              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 disabled:shadow-none ${
                 scheduleCreateMode === 'manual'
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  : 'border border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
+                  ? 'bg-secondary-600 text-white hover:bg-secondary-700'
+                  : 'border border-secondary-500 bg-white text-secondary-700 hover:bg-secondary-50'
               }`}
             >
               ✋ Tạo lịch thủ công
@@ -1228,16 +1194,16 @@ export function EventPage() {
                 return (
                 <div key={round}>
                   <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
                       Vòng {round}
                     </h4>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-neutral-400">
                       {matches.length} trận
                       {event.courts.length === 1 ? ' · 1 sân' : ''}
                     </span>
                   </div>
                   {restingPairs.length > 0 && (
-                    <p className="mb-3 text-xs text-slate-500">
+                    <p className="mb-3 text-xs text-neutral-500">
                       Nghỉ:{' '}
                       {restingPairs
                         .map((pair) => {
@@ -1265,22 +1231,22 @@ export function EventPage() {
                             key={match.id}
                             className={`flex h-full flex-col rounded-2xl border p-4 shadow-sm ${
                               match.completed
-                                ? 'border-green-400 bg-green-50'
-                                : 'border-slate-200 bg-white'
+                                ? 'border-secondary-500 bg-secondary-50'
+                                : 'border-neutral-200 bg-white'
                             }`}
                           >
                             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
+                                <span className="rounded-lg bg-neutral-800 px-2.5 py-1 text-xs font-bold text-white">
                                   Sân {match.court}
                                 </span>
                                 {match.group && (
-                                  <span className="rounded-lg bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                                  <span className="rounded-lg bg-secondary-50 px-2.5 py-1 text-xs font-semibold text-secondary-700">
                                     {match.group}
                                   </span>
                                 )}
                                 {match.completed && (
-                                  <span className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-semibold text-white">
+                                  <span className="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white">
                                     Hoàn thành
                                   </span>
                                 )}
@@ -1301,7 +1267,7 @@ export function EventPage() {
                                 participants={event.participants}
                               />
                               <div className="flex items-center justify-center">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-bold text-neutral-700">
                                   VS
                                 </span>
                               </div>
@@ -1313,7 +1279,7 @@ export function EventPage() {
                             </div>
 
                             {match.completed && (
-                              <p className="my-4 text-center text-2xl font-bold text-green-600">
+                              <p className="my-4 text-center text-2xl font-bold text-primary-600">
                                 {match.score1} – {match.score2}
                               </p>
                             )}
@@ -1321,7 +1287,7 @@ export function EventPage() {
                             <button
                               type="button"
                               onClick={() => setSelectedMatch(match)}
-                              className="mt-4 w-full rounded-lg border border-green-400 bg-green-50 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-100"
+                              className="mt-4 w-full rounded-lg border border-secondary-500 bg-secondary-50 py-2.5 text-sm font-semibold text-secondary-700 hover:bg-secondary-50"
                             >
                               {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
                             </button>
@@ -1339,13 +1305,13 @@ export function EventPage() {
 
       {groupMatches.length > 0 && (
         <CollapsibleSection
+          id="section-standings"
           title="Bảng xếp hạng"
           description="Xếp hạng theo số trận thắng, hiệu số điểm và tổng điểm ghi được (chỉ tính vòng bảng)"
           visible={sectionVisibility.standings}
-          onToggle={() => toggleSection('standings')}
         >
           {!hasCompletedMatches(groupMatches) && (
-            <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="mb-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
               Cập nhật kết quả từng trận để bảng xếp hạng tự động cập nhật.
             </p>
           )}
@@ -1360,10 +1326,10 @@ export function EventPage() {
 
       {groupMatches.length > 0 && event.courts.length > 0 && event.pairs.length >= 2 && (
         <CollapsibleSection
+          id="section-playoffs"
           title="Vòng loại trực tiếp"
           description="Tứ kết, bán kết, chung kết — kết quả không cập nhật vào bảng xếp hạng"
           visible={sectionVisibility.playoffs}
-          onToggle={() => toggleSection('playoffs')}
         >
           <PlayoffSection
             pairs={event.pairs}
@@ -1380,6 +1346,7 @@ export function EventPage() {
         </CollapsibleSection>
       )}
 
+        </div>
       </div>
 
       <ContributionDialog
@@ -1420,6 +1387,16 @@ export function EventPage() {
         excludedNames={event.participants.map((p) => p.name)}
         onClose={() => setParticipantPickerOpen(false)}
         onSelect={addParticipant}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Xóa event"
+        message={`Bạn có chắc muốn xóa "${event.name}"? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDeleteEvent}
+        onCancel={() => setDeleteConfirmOpen(false)}
       />
 
       <ConfirmDialog

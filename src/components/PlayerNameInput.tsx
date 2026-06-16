@@ -132,13 +132,13 @@ export function PlayerNameInput({
             autoComplete="off"
             className={
               className ||
-              'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20'
+              'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20'
             }
           />
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="shrink-0 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
             title="Chọn từ danh sách CLB"
           >
             Chọn
@@ -146,7 +146,7 @@ export function PlayerNameInput({
         </div>
 
         {showSuggestions && (
-          <ul className="absolute left-0 right-12 z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          <ul className="absolute left-0 right-12 z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
             {suggestions.map((name, index) => (
               <li key={name}>
                 <button
@@ -155,8 +155,8 @@ export function PlayerNameInput({
                   onClick={() => selectSuggestion(name)}
                   className={`w-full px-3 py-2 text-left text-sm ${
                     index === highlightIndex
-                      ? 'bg-green-50 font-medium text-green-800'
-                      : 'text-slate-800 hover:bg-slate-50'
+                      ? 'bg-secondary-50 font-medium text-secondary-700'
+                      : 'text-neutral-800 hover:bg-neutral-50'
                   }`}
                 >
                   {name}

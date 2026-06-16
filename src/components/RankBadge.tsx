@@ -6,7 +6,7 @@ const SIZES = {
 
 const RANK_COLORS: Record<1 | 2 | 3, string> = {
   1: 'bg-amber-500',
-  2: 'bg-slate-400',
+  2: 'bg-neutral-400',
   3: 'bg-orange-500',
 }
 
@@ -43,6 +43,6 @@ export function RankDisplay({
   }
 
   return (
-    <span className="inline-flex w-8 justify-center text-sm font-bold text-slate-400">{rank}</span>
+    <span className="inline-flex w-8 justify-center text-sm font-bold text-neutral-400">{rank}</span>
   )
 }

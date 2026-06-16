@@ -1,9 +1,12 @@
+import { Button } from './ui/Button'
+
 interface ConfirmDialogProps {
   open: boolean
   title: string
   message: string
   confirmLabel?: string
   cancelLabel?: string
+  confirmVariant?: 'primary' | 'danger'
   onConfirm: () => void
   onCancel: () => void
 }
@@ -14,6 +17,7 @@ export function ConfirmDialog({
   message,
   confirmLabel = 'Xác nhận',
   cancelLabel = 'Hủy',
+  confirmVariant = 'primary',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -22,24 +26,20 @@ export function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-        <p className="mt-2 text-sm text-slate-600">{message}</p>
+      <div className="relative w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+        <p className="mt-2 text-sm text-neutral-600">{message}</p>
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Button variant="secondary" onClick={onCancel}>
             {cancelLabel}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={confirmVariant === 'danger' ? 'danger' : 'primary'}
+            className={confirmVariant === 'danger' ? 'bg-red-600 text-white hover:bg-red-700' : undefined}
             onClick={onConfirm}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

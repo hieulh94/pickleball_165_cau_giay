@@ -29,7 +29,7 @@ function PairMiniCard({
 }) {
   if (!pair || pairNumber < 1) {
     return (
-      <div className="flex min-h-[5rem] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+      <div className="flex min-h-[5rem] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-sm text-neutral-400">
         —
       </div>
     )
@@ -79,26 +79,26 @@ function ShowMatchCard({
   return (
     <div
       className={`flex flex-col rounded-2xl border p-4 shadow-sm ${
-        match.completed ? 'border-fuchsia-400 bg-fuchsia-50' : 'border-slate-200 bg-white'
+        match.completed ? 'border-primary-300 bg-primary-50' : 'border-neutral-200 bg-white'
       }`}
     >
       <div className="mb-3 flex items-start gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <span className="rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-bold text-white">
+          <span className="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-bold text-white">
             Bo3
           </span>
           {match.name && (
-            <span className="rounded-lg bg-fuchsia-700 px-2.5 py-1 text-xs font-bold text-white">
+            <span className="rounded-lg bg-primary-700 px-2.5 py-1 text-xs font-bold text-white">
               {match.name}
             </span>
           )}
           {match.scheduledAt && (
-            <span className="rounded-lg bg-slate-700 px-2.5 py-1 text-xs font-bold text-white">
+            <span className="rounded-lg bg-neutral-700 px-2.5 py-1 text-xs font-bold text-white">
               {formatScheduledAt(match.scheduledAt)}
             </span>
           )}
           {match.completed && (
-            <span className="rounded-lg bg-fuchsia-600 px-2.5 py-1 text-xs font-semibold text-white">
+            <span className="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white">
               Hoàn thành
             </span>
           )}
@@ -120,17 +120,17 @@ function ShowMatchCard({
       <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-stretch gap-2">
         <PairMiniCard pair={pair1} pairNumber={pair1Number} participants={participants} />
         <div className="flex items-center justify-center">
-          <span className="text-[10px] font-bold text-slate-500">VS</span>
+          <span className="text-[10px] font-bold text-neutral-500">VS</span>
         </div>
         <PairMiniCard pair={pair2} pairNumber={pair2Number} participants={participants} />
       </div>
 
       {gamesWon && (
         <div className="my-3 text-center">
-          <p className="text-2xl font-bold text-fuchsia-700">
+          <p className="text-2xl font-bold text-primary-700">
             {gamesWon.score1} – {gamesWon.score2}
           </p>
-          {gameDetail && <p className="mt-1 text-xs text-slate-500">{gameDetail}</p>}
+          {gameDetail && <p className="mt-1 text-xs text-neutral-500">{gameDetail}</p>}
           {!match.completed && gamesWon && (
             <p className="mt-0.5 text-xs text-amber-700">Đang đấu</p>
           )}
@@ -142,7 +142,7 @@ function ShowMatchCard({
           <button
             type="button"
             onClick={() => onEditMatch(match)}
-            className="rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-neutral-300 bg-white py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
           >
             Sửa thông tin
           </button>
@@ -150,7 +150,7 @@ function ShowMatchCard({
         <button
           type="button"
           onClick={() => onUpdateResult(match)}
-          className="rounded-lg border border-fuchsia-400 bg-fuchsia-50 py-2.5 text-sm font-semibold text-fuchsia-900 hover:bg-fuchsia-100"
+          className="rounded-lg border border-primary-300 bg-primary-50 py-2.5 text-sm font-semibold text-primary-800 hover:bg-primary-50"
         >
           {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
         </button>
@@ -181,42 +181,42 @@ function ShowmatchWeekBlock({
   onUpdateResult: (match: Match) => void
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+    <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-slate-50"
+        className="flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-neutral-50"
       >
-        <span className="text-sm text-slate-400">{expanded ? '▼' : '▶'}</span>
+        <span className="text-sm text-neutral-400">{expanded ? '▼' : '▶'}</span>
         <div className="min-w-0 flex-1">
           {group.weekKey === 'no-date' ? (
-            <p className="text-sm font-semibold text-slate-800">{group.weekLabel}</p>
+            <p className="text-sm font-semibold text-neutral-800">{group.weekLabel}</p>
           ) : (
-            <p className="text-sm font-semibold text-slate-800">
+            <p className="text-sm font-semibold text-neutral-800">
               Tuần {group.weekNumber}
-              <span className="font-normal text-slate-500"> · {group.weekLabel}</span>
+              <span className="font-normal text-neutral-500"> · {group.weekLabel}</span>
             </p>
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           {group.isCurrentWeek && (
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+            <span className="rounded-full bg-secondary-50 px-2 py-0.5 text-[10px] font-bold text-secondary-700">
               Tuần này
             </span>
           )}
           {group.isPastWeek && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600">
               Đã qua
             </span>
           )}
-          <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-bold text-fuchsia-800">
+          <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-bold text-primary-700">
             {group.matches.length} trận
           </span>
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+        <div className="border-t border-neutral-100 px-4 pb-4 pt-3">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {group.matches.map((match) => (
               <ShowMatchCard
@@ -332,15 +332,15 @@ export function ShowMatchSection({
         onToggle={onCreateFormToggle}
         className="mt-0"
       >
-        <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50/50 p-4 sm:p-5">
-        <h4 className="text-sm font-semibold text-fuchsia-900">Tạo trận showmatch</h4>
-        <p className="mt-1 text-xs text-fuchsia-800">
+        <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-4 sm:p-5">
+        <h4 className="text-sm font-semibold text-primary-800">Tạo trận showmatch</h4>
+        <p className="mt-1 text-xs text-primary-700">
           Nhập tên 4 người chơi (2 cặp), ngày giờ — kèo Bo3 (chạm 2).
         </p>
 
         <div className="mt-4 space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">
+            <label className="mb-1 block text-xs font-medium text-neutral-700">
               Tên trận (tùy chọn)
             </label>
             <input
@@ -349,7 +349,7 @@ export function ShowMatchSection({
               onChange={(e) => setName(e.target.value)}
               list="showmatch-name-presets"
               placeholder="VD: Showmatch 1"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
             />
             <datalist id="showmatch-name-presets">
               {SHOWMATCH_NAME_PRESETS.map((preset) => (
@@ -362,7 +362,7 @@ export function ShowMatchSection({
                   key={preset}
                   type="button"
                   onClick={() => setName(preset)}
-                  className="rounded-full border border-fuchsia-300 bg-white px-2.5 py-1 text-xs font-medium text-fuchsia-800 hover:bg-fuchsia-100"
+                  className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50"
                 >
                   {preset}
                 </button>
@@ -372,63 +372,63 @@ export function ShowMatchSection({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Ngày</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-700">Ngày</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Giờ</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-700">Giờ</label>
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-fuchsia-200 bg-white p-3">
-              <p className="text-xs font-semibold text-fuchsia-900">Cặp 1</p>
+            <div className="rounded-xl border border-primary-200 bg-white p-3">
+              <p className="text-xs font-semibold text-primary-800">Cặp 1</p>
               <div className="mt-2 space-y-2">
                 <PlayerNameInput
                   value={pair1Player1}
                   onChange={setPair1Player1}
                   placeholder="Chọn hoặc nhập người chơi 1"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                 />
                 <PlayerNameInput
                   value={pair1Player2}
                   onChange={setPair1Player2}
                   placeholder="Chọn hoặc nhập người chơi 2"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                 />
               </div>
             </div>
 
-            <div className="rounded-xl border border-fuchsia-200 bg-white p-3">
-              <p className="text-xs font-semibold text-fuchsia-900">Cặp 2</p>
+            <div className="rounded-xl border border-primary-200 bg-white p-3">
+              <p className="text-xs font-semibold text-primary-800">Cặp 2</p>
               <div className="mt-2 space-y-2">
                 <PlayerNameInput
                   value={pair2Player1}
                   onChange={setPair2Player1}
                   placeholder="Chọn hoặc nhập người chơi 1"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                 />
                 <PlayerNameInput
                   value={pair2Player2}
                   onChange={setPair2Player2}
                   placeholder="Chọn hoặc nhập người chơi 2"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                 />
               </div>
             </div>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-neutral-500">
             Chọn từ danh sách CLB hoặc nhập tên — cùng một người có thể tham gia nhiều trận khác nhau.
           </p>
         </div>
@@ -437,7 +437,7 @@ export function ShowMatchSection({
           type="button"
           onClick={handleCreate}
           disabled={!canCreate}
-          className="mt-4 w-full rounded-lg bg-fuchsia-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-fuchsia-700 disabled:opacity-50 sm:w-auto"
+          className="mt-4 w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
         >
           + Tạo trận showmatch
         </button>
@@ -445,11 +445,11 @@ export function ShowMatchSection({
         </div>
       </CollapsibleSection>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-900">Lịch thi đấu</h3>
+      <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-neutral-900">Lịch thi đấu</h3>
 
         {matches.length === 0 ? (
-          <p className="mt-4 text-center text-sm text-slate-500">Chưa có trận showmatch nào.</p>
+          <p className="mt-4 text-center text-sm text-neutral-500">Chưa có trận showmatch nào.</p>
         ) : (
           <div className="mt-4 space-y-3">
           {weekGroups.map((group) => (

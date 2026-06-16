@@ -33,8 +33,8 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-slate-900">Event mới</h3>
+      <div className="relative w-full max-w-lg rounded-xl border border-neutral-200 bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-neutral-900">Event mới</h3>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button
@@ -47,8 +47,8 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
             }}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
               eventType === 'tournament'
-                ? 'bg-green-600 text-white'
-                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                ? 'bg-primary-600 text-white'
+                : 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
             }`}
           >
             Mini game
@@ -63,8 +63,8 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
             }}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
               eventType === 'showmatch'
-                ? 'bg-fuchsia-600 text-white'
-                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                ? 'bg-primary-600 text-white'
+                : 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
             }`}
           >
             Showmatch tuần
@@ -82,7 +82,7 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
                 ? getDefaultShowmatchName()
                 : 'Tên event (VD: Mini game thứ 7)'
             }
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
             autoFocus
           />
           <input
@@ -91,7 +91,7 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
             onChange={(e) => setEventPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             placeholder="Password event (không bắt buộc)"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
           />
         </div>
 
@@ -100,7 +100,7 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
           >
             Hủy
           </button>
@@ -108,7 +108,7 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
             type="button"
             onClick={handleSubmit}
             disabled={saving || !eventName.trim()}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {saving ? 'Đang lưu...' : 'Tạo'}
           </button>

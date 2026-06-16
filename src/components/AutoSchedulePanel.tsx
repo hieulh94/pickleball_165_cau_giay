@@ -19,12 +19,12 @@ export function AutoSchedulePanel({
           ? ' Với 1 sân, mỗi vòng có đúng 1 trận (2 cặp đấu, các cặp còn lại nghỉ).'
           : ` Mỗi vòng tối đa ${courts.length} trận theo số sân.`}
       </p>
-      <ul className="mt-3 space-y-1 text-xs text-slate-600">
+      <ul className="mt-3 space-y-1 text-xs text-neutral-600">
         <li>
-          <span className="font-medium text-slate-700">{pairCount}</span> cặp đôi
+          <span className="font-medium text-neutral-700">{pairCount}</span> cặp đôi
         </li>
         <li>
-          <span className="font-medium text-slate-700">{courts.length}</span> sân:{' '}
+          <span className="font-medium text-neutral-700">{courts.length}</span> sân:{' '}
           {courts.map((c) => `Sân ${c}`).join(', ')}
         </li>
       </ul>

@@ -1,5 +1,52 @@
 @import "tailwindcss";
 
+/* ─── Light theme (default) ─── */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+
+  --color-secondary-50: #ecfdf5;
+  --color-secondary-500: #10b981;
+  --color-secondary-600: #059669;
+  --color-secondary-700: #047857;
+
+  --color-warning-500: #f59e0b;
+  --color-danger-500: #ef4444;
+
+  --color-surface: #fafafc;
+  --color-card: #ffffff;
+  --color-border: #e5e7eb;
+
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+}
+
+/* ─── Dark theme tokens (apply via .dark on html) ─── */
+@layer base {
+  .dark {
+    --color-surface: #0f0f12;
+    --color-card: #18181b;
+    --color-border: #27272a;
+
+    --color-text-primary: #f4f4f5;
+    --color-text-secondary: #a1a1aa;
+
+    --color-primary-50: #2e1065;
+    --color-primary-100: #3b0764;
+    --color-primary-600: #a78bfa;
+    --color-primary-700: #8b5cf6;
+
+    --color-secondary-50: #064e3b;
+    --color-secondary-500: #34d399;
+    --color-secondary-600: #10b981;
+    --color-secondary-700: #6ee7b7;
+  }
+}
+
 html,
 body,
 #root {
@@ -8,7 +55,16 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-surface font-sans text-text-primary antialiased;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes firework-burst {
@@ -43,12 +99,47 @@ body {
   animation: firework-flash-pulse 1.4s ease-in-out infinite;
 }
 
-.coverflow-stage {
-  transform-style: preserve-3d;
+@keyframes podium-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.coverflow-slide {
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-  will-change: transform, opacity;
+@keyframes progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.leaderboard-podium-enter {
+  animation: podium-enter 0.45s ease-out both;
+}
+
+.leaderboard-podium-enter:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.leaderboard-podium-enter:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.leaderboard-podium-enter:nth-child(3) {
+  animation-delay: 0.25s;
+}
+
+.leaderboard-progress-fill {
+  transform-origin: left center;
+  animation: progress-grow 0.6s ease-out both;
+}
+
+.leaderboard-row {
+  animation: podium-enter 0.35s ease-out both;
 }

@@ -18,46 +18,11 @@ interface PlayerContribution {
   wins: number
 }
 
-function ensurePlayer(
-  stats: Map<string, PlayerContribution>,
-  rawName: string,
-): PlayerContribution {
-  const key = normalizeParticipantName(rawName)
-  const existing = stats.get(key)
-  if (existing) return existing
+export type PlayerContributionStats = PlayerContribution
 
-  const created: PlayerContribution = {
-    displayName: formatParticipantName(rawName),
-    totalAmount: 0,
-    contributionEventIds: new Set(),
-    matchesPlayed: 0,
-    wins: 0,
-  }
-  stats.set(key, created)
-  return created
-}
-
-function assignRanks(
-  rows: Omit<ContributionStanding, 'rank'>[],
-): ContributionStanding[] {
-  const result: ContributionStanding[] = []
-  for (let i = 0; i < rows.length; i++) {
-    let rank = i + 1
-    if (i > 0) {
-      const cur = rows[i]!
-      const prev = rows[i - 1]!
-      if (cur.totalAmount === prev.totalAmount && cur.eventsContributed === prev.eventsContributed) {
-        rank = result[i - 1]!.rank
-      }
-    }
-    result.push({ ...rows[i]!, rank })
-  }
-  return result
-}
-
-export function calculateContributionStandings(
+export function buildPlayerContributionStats(
   events: PickleballEvent[],
-): ContributionStanding[] {
+): PlayerContributionStats[] {
   const stats = new Map<string, PlayerContribution>()
 
   for (const event of events) {
@@ -104,7 +69,50 @@ export function calculateContributionStandings(
     }
   }
 
-  const rows = [...stats.values()]
+  return [...stats.values()]
+}
+
+function ensurePlayer(
+  stats: Map<string, PlayerContribution>,
+  rawName: string,
+): PlayerContribution {
+  const key = normalizeParticipantName(rawName)
+  const existing = stats.get(key)
+  if (existing) return existing
+
+  const created: PlayerContribution = {
+    displayName: formatParticipantName(rawName),
+    totalAmount: 0,
+    contributionEventIds: new Set(),
+    matchesPlayed: 0,
+    wins: 0,
+  }
+  stats.set(key, created)
+  return created
+}
+
+function assignRanks(
+  rows: Omit<ContributionStanding, 'rank'>[],
+): ContributionStanding[] {
+  const result: ContributionStanding[] = []
+  for (let i = 0; i < rows.length; i++) {
+    let rank = i + 1
+    if (i > 0) {
+      const cur = rows[i]!
+      const prev = rows[i - 1]!
+      if (cur.totalAmount === prev.totalAmount && cur.eventsContributed === prev.eventsContributed) {
+        rank = result[i - 1]!.rank
+      }
+    }
+    result.push({ ...rows[i]!, rank })
+  }
+  return result
+}
+
+export function calculateContributionStandings(
+  events: PickleballEvent[],
+): ContributionStanding[] {
+  const rows = buildPlayerContributionStats(events)
     .filter((row) => row.totalAmount > 0)
     .map((row) => ({
       name: row.displayName,

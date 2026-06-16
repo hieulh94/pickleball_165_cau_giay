@@ -195,6 +195,13 @@ export function formatScheduledAt(iso: string): string {
   })
 }
 
+export function formatShortScheduledAt(iso: string): string {
+  const parsed = new Date(iso)
+  if (Number.isNaN(parsed.getTime())) return iso
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)} - ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`
+}
+
 export function sortShowMatches(matches: Match[]): Match[] {
   return [...matches].sort((a, b) => {
     const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0

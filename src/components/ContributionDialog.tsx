@@ -83,27 +83,27 @@ export function ContributionDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative flex max-h-[min(90dvh,40rem)] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl">
-        <div className="shrink-0 border-b border-slate-100 px-6 py-4">
-          <h3 className="text-lg font-semibold text-slate-900">Tiền cống hiến</h3>
-          <p className="mt-1 text-sm text-slate-500">
+        <div className="shrink-0 border-b border-neutral-100 px-6 py-4">
+          <h3 className="text-lg font-semibold text-neutral-900">Tiền cống hiến</h3>
+          <p className="mt-1 text-sm text-neutral-500">
             Nhập số tiền từng người nộp — dùng để tính BXH cống hiến
           </p>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {participants.length === 0 ? (
-            <p className="text-sm text-slate-500">Thêm người tham gia trước khi nhập tiền cống hiến.</p>
+            <p className="text-sm text-neutral-500">Thêm người tham gia trước khi nhập tiền cống hiến.</p>
           ) : (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+            <div className="rounded-xl border border-primary-200 bg-secondary-50/60 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-emerald-900">
+                <p className="text-sm font-semibold text-secondary-700">
                   {participants.length} người tham gia
                 </p>
                 {editing ? (
                   <button
                     type="button"
                     onClick={handleSave}
-                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
                   >
                     Lưu
                   </button>
@@ -111,14 +111,14 @@ export function ContributionDialog({
                   <button
                     type="button"
                     onClick={handleEdit}
-                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                   >
                     Chỉnh sửa
                   </button>
                 )}
               </div>
 
-              <ul className="mt-4 divide-y divide-emerald-100 overflow-hidden rounded-xl border border-emerald-100 bg-white">
+              <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
                 {participants.map((participant) => {
                   const savedAmount = participantContributions?.[participant.id] ?? 0
                   return (
@@ -127,11 +127,11 @@ export function ContributionDialog({
                       className="flex items-center justify-between gap-3 px-4 py-3"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-900">
+                        <p className="truncate text-sm font-medium text-neutral-900">
                           {participant.name}
                         </p>
                         {!editing && (
-                          <p className="text-xs text-slate-500">Trình độ {participant.skillLevel}</p>
+                          <p className="text-xs text-neutral-500">Trình độ {participant.skillLevel}</p>
                         )}
                       </div>
                       {editing ? (
@@ -145,10 +145,10 @@ export function ContributionDialog({
                               [participant.id]: e.target.value,
                             }))
                           }
-                          className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-right text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                          className="w-32 rounded-lg border border-neutral-300 px-3 py-2 text-right text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                         />
                       ) : (
-                        <span className="shrink-0 text-sm font-semibold text-emerald-800">
+                        <span className="shrink-0 text-sm font-semibold text-secondary-700">
                           {formatContributionAmount(savedAmount)}
                         </span>
                       )}
@@ -157,21 +157,21 @@ export function ContributionDialog({
                 })}
               </ul>
 
-              <p className="mt-4 text-sm font-semibold text-emerald-900">
+              <p className="mt-4 text-sm font-semibold text-secondary-700">
                 Tổng thu: {formatContributionAmount(editing ? draftTotal : savedTotal)}
               </p>
-              <p className="mt-1 text-xs text-emerald-800">
+              <p className="mt-1 text-xs text-secondary-700">
                 Số tiền &gt; 0 của mỗi người sẽ được cộng vào BXH cống hiến.
               </p>
             </div>
           )}
         </div>
 
-        <div className="shrink-0 border-t border-slate-100 px-6 py-4">
+        <div className="shrink-0 border-t border-neutral-100 px-6 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+            className="w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 sm:w-auto"
           >
             Đóng
           </button>

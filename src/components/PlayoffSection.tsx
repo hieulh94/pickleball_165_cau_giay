@@ -41,7 +41,7 @@ function PairStandingHint({
       className={`mt-1.5 rounded-lg px-2.5 py-2 text-xs leading-relaxed ${
         isTop
           ? 'border border-amber-200 bg-amber-50 text-amber-900'
-          : 'border border-violet-100 bg-white text-slate-600'
+          : 'border border-primary-100 bg-white text-neutral-600'
       }`}
     >
       {detail}
@@ -78,7 +78,7 @@ function PairMiniCard({
 }) {
   if (!pair || pairNumber < 1) {
     return (
-      <div className="flex min-h-[5rem] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+      <div className="flex min-h-[5rem] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-sm text-neutral-400">
         —
       </div>
     )
@@ -177,17 +177,17 @@ export function PlayoffSection({
 
   return (
     <div className="space-y-6">
-      <p className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+      <p className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
         Trận vòng loại trực tiếp (tứ kết, bán kết, chung kết…) không ảnh hưởng bảng xếp
         hạng vòng bảng.
       </p>
 
-      <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 sm:p-5">
-        <h4 className="text-sm font-semibold text-violet-900">Tạo trận đấu mới</h4>
+      <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-4 sm:p-5">
+        <h4 className="text-sm font-semibold text-primary-800">Tạo trận đấu mới</h4>
 
         <div className="mt-4 space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">
+            <label className="mb-1 block text-xs font-medium text-neutral-700">
               Tên trận (VD: Tứ kết, Bán kết, Chung kết)
             </label>
             <input
@@ -196,7 +196,7 @@ export function PlayoffSection({
               onChange={(e) => setName(e.target.value)}
               list="playoff-name-presets"
               placeholder="Nhập tên trận"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
             />
             <datalist id="playoff-name-presets">
               {PLAYOFF_NAME_PRESETS.map((preset) => (
@@ -209,7 +209,7 @@ export function PlayoffSection({
                   key={preset}
                   type="button"
                   onClick={() => setName(preset)}
-                  className="rounded-full border border-violet-300 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100"
+                  className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-xs font-medium text-primary-800 hover:bg-primary-50"
                 >
                   {preset}
                 </button>
@@ -218,12 +218,12 @@ export function PlayoffSection({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-700">Sân</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-700">Sân</label>
             <select
               value={court}
               onChange={(e) => setCourt(e.target.value)}
               disabled={courts.length === 0}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:bg-slate-100"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20 disabled:bg-neutral-100"
             >
               <option value="">Chọn sân</option>
               {courts.map((c) => (
@@ -236,11 +236,11 @@ export function PlayoffSection({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Cặp 1</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-700">Cặp 1</label>
               <select
                 value={pair1Id}
                 onChange={(e) => setPair1Id(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
               >
                 <option value="">Chọn cặp</option>
                 {pairOptions.map((opt) => (
@@ -258,11 +258,11 @@ export function PlayoffSection({
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-700">Cặp 2</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-700">Cặp 2</label>
               <select
                 value={pair2Id}
                 onChange={(e) => setPair2Id(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
               >
                 <option value="">Chọn cặp</option>
                 {pairOptions
@@ -287,14 +287,14 @@ export function PlayoffSection({
           type="button"
           onClick={handleCreate}
           disabled={!canCreate}
-          className="mt-4 w-full rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50 sm:w-auto"
+          className="mt-4 w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 sm:w-auto"
         >
           + Tạo trận
         </button>
       </div>
 
       {matches.length === 0 ? (
-        <p className="text-center text-sm text-slate-500">Chưa có trận vòng loại trực tiếp.</p>
+        <p className="text-center text-sm text-neutral-500">Chưa có trận vòng loại trực tiếp.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {matches.map((match) => {
@@ -308,20 +308,20 @@ export function PlayoffSection({
                 key={match.id}
                 className={`flex flex-col rounded-2xl border p-4 shadow-sm ${
                   match.completed
-                    ? 'border-violet-400 bg-violet-50'
-                    : 'border-slate-200 bg-white'
+                    ? 'border-primary-300 bg-primary-50'
+                    : 'border-neutral-200 bg-white'
                 }`}
               >
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-lg bg-violet-700 px-2.5 py-1 text-xs font-bold text-white">
+                    <span className="rounded-lg bg-primary-700 px-2.5 py-1 text-xs font-bold text-white">
                       {match.name || 'Playoff'}
                     </span>
-                    <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
+                    <span className="rounded-lg bg-neutral-800 px-2.5 py-1 text-xs font-bold text-white">
                       Sân {match.court}
                     </span>
                     {match.completed && (
-                      <span className="rounded-lg bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white">
+                      <span className="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white">
                         Hoàn thành
                       </span>
                     )}
@@ -338,13 +338,13 @@ export function PlayoffSection({
                 <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-stretch gap-2">
                   <PairMiniCard pair={pair1} pairNumber={pair1Number} participants={participants} />
                   <div className="flex items-center justify-center">
-                    <span className="text-[10px] font-bold text-slate-500">VS</span>
+                    <span className="text-[10px] font-bold text-neutral-500">VS</span>
                   </div>
                   <PairMiniCard pair={pair2} pairNumber={pair2Number} participants={participants} />
                 </div>
 
                 {match.completed && (
-                  <p className="my-3 text-center text-2xl font-bold text-violet-700">
+                  <p className="my-3 text-center text-2xl font-bold text-primary-700">
                     {match.score1} – {match.score2}
                   </p>
                 )}
@@ -352,7 +352,7 @@ export function PlayoffSection({
                 <button
                   type="button"
                   onClick={() => onUpdateResult(match)}
-                  className="mt-2 w-full rounded-lg border border-violet-400 bg-violet-50 py-2.5 text-sm font-semibold text-violet-900 hover:bg-violet-100"
+                  className="mt-2 w-full rounded-lg border border-primary-300 bg-primary-50 py-2.5 text-sm font-semibold text-primary-800 hover:bg-primary-50"
                 >
                   {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
                 </button>

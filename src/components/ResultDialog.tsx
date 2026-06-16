@@ -52,8 +52,8 @@ export function ResultDialog({
       <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         {!showConfirm ? (
           <>
-            <h3 className="text-lg font-semibold text-slate-900">Cập nhật kết quả</h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <h3 className="text-lg font-semibold text-neutral-900">Cập nhật kết quả</h3>
+            <p className="mt-1 text-sm text-neutral-500">
               {isPlayoffMatch(match)
                 ? `${match.name || 'Vòng loại trực tiếp'} · Sân ${match.court}`
                 : `Vòng ${match.round} · Sân ${match.court}${match.group ? ` · ${match.group}` : ''}`}
@@ -61,7 +61,7 @@ export function ResultDialog({
 
             <div className="mt-6 space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-1 block text-sm font-medium text-neutral-700">
                   {team1Label}
                 </label>
                 <input
@@ -69,13 +69,13 @@ export function ResultDialog({
                   min={0}
                   value={score1}
                   onChange={(e) => setScore1(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                   placeholder="Điểm"
                 />
               </div>
-              <div className="text-center text-sm font-medium text-slate-400">VS</div>
+              <div className="text-center text-sm font-medium text-neutral-400">VS</div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
+                <label className="mb-1 block text-sm font-medium text-neutral-700">
                   {team2Label}
                 </label>
                 <input
@@ -83,7 +83,7 @@ export function ResultDialog({
                   min={0}
                   value={score2}
                   onChange={(e) => setScore2(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                   placeholder="Điểm"
                 />
               </div>
@@ -93,7 +93,7 @@ export function ResultDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 Hủy
               </button>
@@ -101,7 +101,7 @@ export function ResultDialog({
                 type="button"
                 onClick={handleSave}
                 disabled={score1 === '' || score2 === ''}
-                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
               >
                 Lưu kết quả
               </button>
@@ -109,29 +109,29 @@ export function ResultDialog({
           </>
         ) : (
           <>
-            <h3 className="text-lg font-semibold text-slate-900">Xác nhận kết quả</h3>
-            <p className="mt-3 text-sm text-slate-600">
+            <h3 className="text-lg font-semibold text-neutral-900">Xác nhận kết quả</h3>
+            <p className="mt-3 text-sm text-neutral-600">
               Bạn có chắc muốn cập nhật kết quả trận đấu này?
             </p>
-            <div className="mt-4 rounded-xl bg-slate-50 p-4 text-center">
-              <p className="text-sm font-medium text-slate-800">{team1Label}</p>
-              <p className="my-2 text-2xl font-bold text-green-600">
+            <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-center">
+              <p className="text-sm font-medium text-neutral-800">{team1Label}</p>
+              <p className="my-2 text-2xl font-bold text-primary-600">
                 {score1} - {score2}
               </p>
-              <p className="text-sm font-medium text-slate-800">{team2Label}</p>
+              <p className="text-sm font-medium text-neutral-800">{team2Label}</p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowConfirm(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 Quay lại
               </button>
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
               >
                 Xác nhận
               </button>

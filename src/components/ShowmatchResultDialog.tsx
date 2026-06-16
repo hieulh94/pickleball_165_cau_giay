@@ -117,10 +117,10 @@ export function ShowmatchResultDialog({
   }
 
   const renderGameRow = (index: number, label: string, required: boolean) => (
-    <div key={label} className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/40 p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-fuchsia-800">
+    <div key={label} className="rounded-xl border border-primary-100 bg-primary-50/40 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary-700">
         {label}
-        {!required && <span className="ml-1 font-normal normal-case text-slate-500">(nếu cần)</span>}
+        {!required && <span className="ml-1 font-normal normal-case text-neutral-500">(nếu cần)</span>}
       </p>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <input
@@ -129,20 +129,20 @@ export function ShowmatchResultDialog({
           value={gameInputs[index].score1}
           onChange={(e) => updateGame(index, 'score1', e.target.value)}
           placeholder="Điểm"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
         />
-        <span className="text-xs font-bold text-slate-400">VS</span>
+        <span className="text-xs font-bold text-neutral-400">VS</span>
         <input
           type="number"
           min={0}
           value={gameInputs[index].score2}
           onChange={(e) => updateGame(index, 'score2', e.target.value)}
           placeholder="Điểm"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
         />
       </div>
-      <p className="mt-1 truncate text-[10px] text-slate-500">{team1Label}</p>
-      <p className="truncate text-[10px] text-slate-500">{team2Label}</p>
+      <p className="mt-1 truncate text-[10px] text-neutral-500">{team1Label}</p>
+      <p className="truncate text-[10px] text-neutral-500">{team2Label}</p>
     </div>
   )
 
@@ -153,12 +153,12 @@ export function ShowmatchResultDialog({
         {!showConfirm ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold text-slate-900">Kết quả Bo3</h3>
-              <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-xs font-bold text-fuchsia-800">
+              <h3 className="text-lg font-semibold text-neutral-900">Kết quả Bo3</h3>
+              <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-bold text-primary-700">
                 Chạm 2
               </span>
             </div>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-neutral-500">
               {match.name || 'Showmatch'} · Sân {match.court}
               {match.scheduledAt ? ` · ${formatScheduledAt(match.scheduledAt)}` : ''}
             </p>
@@ -170,9 +170,9 @@ export function ShowmatchResultDialog({
             </div>
 
             {parsedGames.length > 0 && (
-              <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-center">
-                <p className="text-xs text-slate-500">Tỷ số ván</p>
-                <p className="text-2xl font-bold text-fuchsia-700">
+              <div className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-center">
+                <p className="text-xs text-neutral-500">Tỷ số ván</p>
+                <p className="text-2xl font-bold text-primary-700">
                   {gamesWon.score1} – {gamesWon.score2}
                 </p>
                 {canSavePartialShowmatchGames(parsedGames) && (
@@ -202,7 +202,7 @@ export function ShowmatchResultDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 Hủy
               </button>
@@ -210,7 +210,7 @@ export function ShowmatchResultDialog({
                 type="button"
                 onClick={handleSave}
                 disabled={parsedGames.length === 0}
-                className="rounded-lg bg-fuchsia-600 px-4 py-2 text-sm font-medium text-white hover:bg-fuchsia-700 disabled:opacity-50"
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
               >
                 Lưu kết quả
               </button>
@@ -218,17 +218,17 @@ export function ShowmatchResultDialog({
           </>
         ) : (
           <>
-            <h3 className="text-lg font-semibold text-slate-900">Xác nhận kết quả Bo3</h3>
-            <p className="mt-3 text-sm text-slate-600">
+            <h3 className="text-lg font-semibold text-neutral-900">Xác nhận kết quả Bo3</h3>
+            <p className="mt-3 text-sm text-neutral-600">
               Bạn có chắc muốn cập nhật kết quả trận này?
             </p>
-            <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4 text-center">
-              <p className="text-sm font-medium text-slate-800">{team1Label}</p>
-              <p className="text-2xl font-bold text-fuchsia-700">
+            <div className="mt-4 space-y-2 rounded-xl bg-neutral-50 p-4 text-center">
+              <p className="text-sm font-medium text-neutral-800">{team1Label}</p>
+              <p className="text-2xl font-bold text-primary-700">
                 {gamesWon.score1} – {gamesWon.score2}
               </p>
-              <p className="text-sm font-medium text-slate-800">{team2Label}</p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="text-sm font-medium text-neutral-800">{team2Label}</p>
+              <p className="mt-2 text-xs text-neutral-500">
                 {parsedGames.map((g, i) => `Ván ${i + 1}: ${g.score1}-${g.score2}`).join(' · ')}
               </p>
               {canSavePartialShowmatchGames(parsedGames) && (
@@ -243,14 +243,14 @@ export function ShowmatchResultDialog({
               <button
                 type="button"
                 onClick={() => setShowConfirm(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
               >
                 Quay lại
               </button>
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="rounded-lg bg-fuchsia-600 px-4 py-2 text-sm font-medium text-white hover:bg-fuchsia-700"
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
               >
                 Xác nhận
               </button>
