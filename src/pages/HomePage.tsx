@@ -287,7 +287,7 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <div className="col-span-full rounded-xl border border-neutral-200 bg-white p-12 text-center">
             <p className="text-neutral-500">Đang tải dữ liệu...</p>
