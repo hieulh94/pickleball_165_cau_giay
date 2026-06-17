@@ -55,11 +55,11 @@ export function ContributionLeaderboardPanel() {
   if (!isFirebaseConfigured()) return null
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 pb-4">
-      <div className="shrink-0 space-y-4 pb-4">
+    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 space-y-3 px-4 pb-2 pt-3">
         <div>
-          <h2 className="text-xl font-bold text-text-primary sm:text-2xl">Bảng xếp hạng</h2>
-          <p className="mt-0.5 text-sm text-text-secondary">
+          <h2 className="text-lg font-bold text-text-primary sm:text-2xl">Bảng xếp hạng</h2>
+          <p className="mt-0.5 hidden text-sm text-text-secondary sm:block">
             Theo dõi cống hiến, trận đấu và thành tích CLB
           </p>
         </div>
@@ -72,40 +72,42 @@ export function ContributionLeaderboardPanel() {
       </div>
 
       {loading ? (
-        <p className="mt-10 text-center text-sm text-text-secondary">Đang tải bảng xếp hạng...</p>
+        <p className="px-4 py-10 text-center text-sm text-text-secondary">Đang tải bảng xếp hạng...</p>
       ) : standings.length === 0 ? (
-        <p className="mt-6 rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-text-secondary">
+        <p className="mx-4 mt-2 rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-text-secondary">
           Chưa có dữ liệu cho bộ lọc này. Nhập tiền nộp/người ở mini game hoặc chọn khoảng thời gian
           khác.
         </p>
       ) : (
         <>
-          <div className="shrink-0 rounded-2xl border border-border bg-card shadow-sm">
-            <LeaderboardPodium
-              standings={podiumStandings}
-              metric={metric}
-              onSelect={setSelectedPlayer}
-            />
-          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4">
+            <div className="rounded-2xl border border-border bg-card shadow-sm">
+              <LeaderboardPodium
+                standings={podiumStandings}
+                metric={metric}
+                onSelect={setSelectedPlayer}
+              />
+            </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto pt-4">
-            {listStandings.length > 0 ? (
-              <ul className="space-y-3">
-                {listStandings.map((row) => (
-                  <LeaderboardRow
-                    key={row.name}
-                    row={row}
-                    metric={metric}
-                    maxMetricValue={maxMetricValue}
-                    onSelect={setSelectedPlayer}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm text-text-secondary">
-                Chỉ có top 3 trong bộ lọc này.
-              </p>
-            )}
+            <div className="pt-3">
+              {listStandings.length > 0 ? (
+                <ul className="space-y-3">
+                  {listStandings.map((row) => (
+                    <LeaderboardRow
+                      key={row.name}
+                      row={row}
+                      metric={metric}
+                      maxMetricValue={maxMetricValue}
+                      onSelect={setSelectedPlayer}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm text-text-secondary">
+                  Chỉ có top 3 trong bộ lọc này.
+                </p>
+              )}
+            </div>
           </div>
 
           <ContributionHistoryDialog
