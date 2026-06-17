@@ -56,13 +56,7 @@ export function ContributionLeaderboardPanel() {
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 space-y-3 px-4 pb-2 pt-3">
-        <div>
-          <h2 className="text-lg font-bold text-text-primary sm:text-2xl">Bảng xếp hạng</h2>
-          <p className="mt-0.5 hidden text-sm text-text-secondary sm:block">
-            Theo dõi cống hiến, trận đấu và thành tích CLB
-          </p>
-        </div>
+      <div className="shrink-0 border-b border-border/60 px-4 py-2">
         <LeaderboardFilters
           period={period}
           metric={metric}

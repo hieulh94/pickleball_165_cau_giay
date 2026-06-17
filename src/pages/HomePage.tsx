@@ -235,6 +235,13 @@ export function HomePage() {
 
       {activeTab === 'overview' && (
         <>
+          {!loading && (
+            <section className="space-y-3">
+              <SectionLabel>Showmatch tuần</SectionLabel>
+              <ShowmatchWeekSlider events={events} onOpenEvent={handleManage} />
+            </section>
+          )}
+
           <section className="space-y-3">
             <SectionLabel>Tổng quan</SectionLabel>
             {!loading && <DashboardQuickStats stats={dashboardStats} />}
@@ -249,13 +256,6 @@ export function HomePage() {
               </div>
             )}
           </section>
-
-          {!loading && (
-            <section className="space-y-3">
-              <SectionLabel>Showmatch tuần</SectionLabel>
-              <ShowmatchWeekSlider events={events} onOpenEvent={handleManage} />
-            </section>
-          )}
         </>
       )}
 
