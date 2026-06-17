@@ -236,8 +236,7 @@ export function HomePage() {
       {activeTab === 'overview' && (
         <>
           {!loading && (
-            <section className="space-y-3">
-              <SectionLabel>Showmatch tuần</SectionLabel>
+            <section>
               <ShowmatchWeekSlider events={events} onOpenEvent={handleManage} />
             </section>
           )}
