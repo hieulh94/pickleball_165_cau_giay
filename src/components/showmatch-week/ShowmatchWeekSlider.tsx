@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { buildShowmatchWeekSlides } from '../../lib/showmatch'
+import { buildShowmatchWeekSlides, type WeeklyShowmatchItem } from '../../lib/showmatch'
 import type { PickleballEvent } from '../../types'
+import { ShowmatchMatchDetailDialog } from './ShowmatchMatchDetailDialog'
 import { ShowmatchWeekDashboard } from './ShowmatchWeekDashboard'
 import { ShowmatchWeekTimeline } from './ShowmatchWeekTimeline'
 
@@ -17,6 +18,7 @@ export function ShowmatchWeekSlider({ events, onOpenEvent }: ShowmatchWeekSlider
   )
   const [activeIndex, setActiveIndex] = useState(initialIndex)
   const [nowMs] = useState(() => Date.now())
+  const [selectedMatch, setSelectedMatch] = useState<WeeklyShowmatchItem | null>(null)
 
   useEffect(() => {
     setActiveIndex(initialIndex)
@@ -27,27 +29,45 @@ export function ShowmatchWeekSlider({ events, onOpenEvent }: ShowmatchWeekSlider
     [events],
   )
 
+  const handleOpenEventFromDialog = () => {
+    if (!selectedMatch) return
+    const event = eventById.get(selectedMatch.eventId)
+    if (event) onOpenEvent(event)
+    setSelectedMatch(null)
+  }
+
   if (slides.length === 0) return null
 
   const activeSlide = slides[activeIndex] ?? slides[0]
 
   return (
-    <div className="space-y-6">
-      {slides.length > 1 && (
-        <ShowmatchWeekTimeline
-          slides={slides}
-          activeIndex={activeIndex}
-          onSelect={setActiveIndex}
-        />
-      )}
+    <>
+      <div className="space-y-6">
+        {slides.length > 1 && (
+          <ShowmatchWeekTimeline
+            slides={slides}
+            activeIndex={activeIndex}
+            onSelect={setActiveIndex}
+          />
+        )}
 
-      <ShowmatchWeekDashboard
-        key={activeSlide.weekStart.toISOString()}
-        slide={activeSlide}
+        <ShowmatchWeekDashboard
+          key={activeSlide.weekStart.toISOString()}
+          slide={activeSlide}
+          nowMs={nowMs}
+          onOpenEvent={onOpenEvent}
+          onSelectMatch={setSelectedMatch}
+          eventById={eventById}
+        />
+      </div>
+
+      <ShowmatchMatchDetailDialog
+        open={selectedMatch !== null}
+        item={selectedMatch}
         nowMs={nowMs}
-        onOpenEvent={onOpenEvent}
-        eventById={eventById}
+        onClose={() => setSelectedMatch(null)}
+        onOpenEvent={handleOpenEventFromDialog}
       />
-    </div>
+    </>
   )
 }

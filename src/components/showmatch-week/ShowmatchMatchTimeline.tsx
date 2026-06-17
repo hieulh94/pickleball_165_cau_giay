@@ -33,7 +33,7 @@ const STATUS_COLOR: Record<MatchStatus, string> = {
 interface ShowmatchMatchTimelineProps {
   items: WeeklyShowmatchItem[]
   nowMs: number
-  onOpenMatch: (eventId: string) => void
+  onSelectMatch: (item: WeeklyShowmatchItem) => void
 }
 
 function sortBySchedule(items: WeeklyShowmatchItem[]): WeeklyShowmatchItem[] {
@@ -126,7 +126,7 @@ function TimelineRow({ item, nowMs, isLast, onOpen }: TimelineRowProps) {
   )
 }
 
-export function ShowmatchMatchTimeline({ items, nowMs, onOpenMatch }: ShowmatchMatchTimelineProps) {
+export function ShowmatchMatchTimeline({ items, nowMs, onSelectMatch }: ShowmatchMatchTimelineProps) {
   const sorted = sortBySchedule(items)
 
   if (sorted.length === 0) return null
@@ -139,7 +139,7 @@ export function ShowmatchMatchTimeline({ items, nowMs, onOpenMatch }: ShowmatchM
           item={item}
           nowMs={nowMs}
           isLast={index === sorted.length - 1}
-          onOpen={() => onOpenMatch(item.eventId)}
+          onOpen={() => onSelectMatch(item)}
         />
       ))}
     </ol>

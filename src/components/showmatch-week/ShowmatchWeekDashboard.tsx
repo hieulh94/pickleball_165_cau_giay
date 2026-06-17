@@ -1,4 +1,4 @@
-import type { ShowmatchWeekSlide } from '../../lib/showmatch'
+import type { ShowmatchWeekSlide, WeeklyShowmatchItem } from '../../lib/showmatch'
 import type { PickleballEvent } from '../../types'
 import { cn } from '../../lib/cn'
 import { ShowmatchMatchTimeline } from './ShowmatchMatchTimeline'
@@ -22,6 +22,7 @@ interface ShowmatchWeekDashboardProps {
   slide: ShowmatchWeekSlide
   nowMs: number
   onOpenEvent: (event: PickleballEvent) => void
+  onSelectMatch: (item: WeeklyShowmatchItem) => void
   eventById: Map<string, PickleballEvent>
 }
 
@@ -29,6 +30,7 @@ export function ShowmatchWeekDashboard({
   slide,
   nowMs,
   onOpenEvent,
+  onSelectMatch,
   eventById,
 }: ShowmatchWeekDashboardProps) {
   const statusLabel = weekStatusLabel(
@@ -45,11 +47,6 @@ export function ShowmatchWeekDashboard({
 
   const openWeek = () => {
     const event = primaryEventId ? eventById.get(primaryEventId) : undefined
-    if (event) onOpenEvent(event)
-  }
-
-  const openMatch = (eventId: string) => {
-    const event = eventById.get(eventId)
     if (event) onOpenEvent(event)
   }
 
@@ -115,7 +112,7 @@ export function ShowmatchWeekDashboard({
             </button>
           </div>
         ) : (
-          <ShowmatchMatchTimeline items={slide.items} nowMs={nowMs} onOpenMatch={openMatch} />
+          <ShowmatchMatchTimeline items={slide.items} nowMs={nowMs} onSelectMatch={onSelectMatch} />
         )}
       </div>
     </article>
