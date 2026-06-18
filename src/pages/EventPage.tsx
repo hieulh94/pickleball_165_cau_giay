@@ -527,6 +527,11 @@ export function EventPage() {
   const groupsLockBlockReason = event.splitGroups
     ? getSetupLockBlockReason(event, 'groups', unpairedParticipants.length)
     : 'Bật chia bảng đấu trước'
+  const scheduleLockBlockReason = getSetupLockBlockReason(
+    event,
+    'schedule',
+    unpairedParticipants.length,
+  )
 
   const doRemoveParticipant = () => {
     if (event.participantsLocked || event.pairsLocked) {
@@ -741,6 +746,10 @@ export function EventPage() {
   }
 
   const handleGenerateSchedule = () => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     if (event.pairs.length < 2) {
       alert('Cần ít nhất 2 cặp đôi. Hãy random cặp đôi trước.')
       return
@@ -765,6 +774,13 @@ export function EventPage() {
   }
 
   const doGenerateSchedule = () => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      setShowRegenerateConfirm(false)
+      setShowCreateScheduleConfirm(false)
+      setScheduleCreateMode(null)
+      return
+    }
     const newGroupMatches = generateSchedule(event.pairs, event.courts)
     persist({ ...event, matches: [...newGroupMatches, ...playoffMatches] })
     setShowRegenerateConfirm(false)
@@ -773,6 +789,10 @@ export function EventPage() {
   }
 
   const toggleScheduleCreateMode = (mode: 'auto' | 'manual') => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     setScheduleCreateMode((prev) => (prev === mode ? null : mode))
   }
 
@@ -782,6 +802,10 @@ export function EventPage() {
     pair1Id: string
     pair2Id: string
   }) => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     if (!event.courts.includes(input.court)) {
       alert('Sân không hợp lệ.')
       return
@@ -856,6 +880,10 @@ export function EventPage() {
     : ''
 
   const handleDeleteGroupMatch = (matchId: string) => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     setMatchToDelete(matchId)
   }
 
@@ -875,8 +903,14 @@ export function EventPage() {
   }
 
   const handleConfirmGroupCountRandom = () => {
-    if (event.groupsLocked || event.pairsLocked) {
-      alert('Bảng đấu đã được chốt hoặc cặp đôi đã chốt.')
+    if (event.groupsLocked || event.pairsLocked || event.scheduleLocked) {
+      alert(
+        event.scheduleLocked
+          ? 'Lịch thi đấu đã được chốt.'
+          : event.groupsLocked
+            ? 'Bảng đấu đã được chốt.'
+            : 'Cặp đôi đã được chốt.',
+      )
       return
     }
     const count = parseGroupCountInput()
@@ -894,8 +928,14 @@ export function EventPage() {
   }
 
   const handleConfirmGroupCountManual = () => {
-    if (event.groupsLocked || event.pairsLocked) {
-      alert('Bảng đấu đã được chốt hoặc cặp đôi đã chốt.')
+    if (event.groupsLocked || event.pairsLocked || event.scheduleLocked) {
+      alert(
+        event.scheduleLocked
+          ? 'Lịch thi đấu đã được chốt.'
+          : event.groupsLocked
+            ? 'Bảng đấu đã được chốt.'
+            : 'Cặp đôi đã được chốt.',
+      )
       return
     }
     const count = parseGroupCountInput()
@@ -920,11 +960,13 @@ export function EventPage() {
   }
 
   const handleConfirmEnableSplitGroups = () => {
-    if (event.groupsLocked || event.pairsLocked) {
+    if (event.groupsLocked || event.pairsLocked || event.scheduleLocked) {
       alert(
-        event.groupsLocked
-          ? 'Bảng đấu đã được chốt.'
-          : 'Cặp đôi đã được chốt.',
+        event.scheduleLocked
+          ? 'Lịch thi đấu đã được chốt.'
+          : event.groupsLocked
+            ? 'Bảng đấu đã được chốt.'
+            : 'Cặp đôi đã được chốt.',
       )
       setShowEnableSplitGroupsConfirm(false)
       return
@@ -939,13 +981,21 @@ export function EventPage() {
       alert('Bảng đấu đã được chốt.')
       return
     }
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     setShowRandomizeGroupsConfirm(true)
   }
 
   const doRandomizeGroups = () => {
     if (!event.splitGroups) return
-    if (event.groupsLocked) {
-      alert('Bảng đấu đã được chốt.')
+    if (event.groupsLocked || event.scheduleLocked) {
+      alert(
+        event.scheduleLocked
+          ? 'Lịch thi đấu đã được chốt.'
+          : 'Bảng đấu đã được chốt.',
+      )
       setShowRandomizeGroupsConfirm(false)
       return
     }
@@ -1001,6 +1051,12 @@ export function EventPage() {
 
   const confirmDeleteMatch = () => {
     if (!matchToDelete) return
+    const pendingDelete = event.matches.find((m) => m.id === matchToDelete)
+    if (pendingDelete && isGroupMatch(pendingDelete) && event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      setMatchToDelete(null)
+      return
+    }
     persist({
       ...event,
       matches: event.matches.filter((m) => m.id !== matchToDelete),
@@ -1022,6 +1078,10 @@ export function EventPage() {
     )
 
   const addCourt = () => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     const num = parseInt(courtInput, 10)
     if (Number.isNaN(num) || num < 1) return
     if (event.courts.includes(num)) {
@@ -1037,6 +1097,10 @@ export function EventPage() {
   }
 
   const removeCourt = (court: number) => {
+    if (event.scheduleLocked) {
+      alert('Lịch thi đấu đã được chốt.')
+      return
+    }
     persist({
       ...event,
       courts: event.courts.filter((c) => c !== court),
@@ -1195,7 +1259,7 @@ export function EventPage() {
             />
             <label
               className={`flex items-center gap-2 ${
-                event.groupsLocked || event.pairsLocked
+                event.groupsLocked || event.pairsLocked || event.scheduleLocked
                   ? 'cursor-not-allowed opacity-60'
                   : 'cursor-pointer'
               }`}
@@ -1203,13 +1267,15 @@ export function EventPage() {
               <input
                 type="checkbox"
                 checked={event.splitGroups}
-                disabled={event.groupsLocked || event.pairsLocked}
+                disabled={event.groupsLocked || event.pairsLocked || event.scheduleLocked}
                 onChange={(e) => {
-                  if (event.groupsLocked || event.pairsLocked) {
+                  if (event.groupsLocked || event.pairsLocked || event.scheduleLocked) {
                     alert(
-                      event.groupsLocked
-                        ? 'Bảng đấu đã được chốt.'
-                        : 'Cặp đôi đã được chốt.',
+                      event.scheduleLocked
+                        ? 'Lịch thi đấu đã được chốt.'
+                        : event.groupsLocked
+                          ? 'Bảng đấu đã được chốt.'
+                          : 'Cặp đôi đã được chốt.',
                     )
                     return
                   }
@@ -1396,8 +1462,25 @@ export function EventPage() {
         title="Lịch thi đấu"
         description="Thêm sân, rồi tạo lịch tự động hoặc thêm từng trận thủ công"
         visible={sectionVisibility.schedule}
+        headerExtra={
+          <SectionLockButton
+            locked={event.scheduleLocked === true}
+            disabled={!event.scheduleLocked && !!scheduleLockBlockReason}
+            disabledTitle={scheduleLockBlockReason ?? undefined}
+            onClick={() => requestSetupLockToggle('schedule')}
+          />
+        }
       >
-        <div className="flex flex-wrap items-end gap-3">
+        {event.scheduleLocked && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            🔒 Đã chốt lịch thi đấu — vẫn có thể nhập kết quả trận.
+          </p>
+        )}
+        <div
+          className={`flex flex-wrap items-end gap-3 ${
+            event.scheduleLocked ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
           <div>
             <label className="mb-1 block text-sm font-medium text-neutral-700">
               Số sân
@@ -1446,7 +1529,7 @@ export function EventPage() {
           </p>
         )}
 
-        {event.pairs.length >= 2 && (
+        {event.pairs.length >= 2 && !event.scheduleLocked && (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -1475,7 +1558,10 @@ export function EventPage() {
           </div>
         )}
 
-        {scheduleCreateMode === 'auto' && event.courts.length > 0 && event.pairs.length >= 2 && (
+        {scheduleCreateMode === 'auto' &&
+          !event.scheduleLocked &&
+          event.courts.length > 0 &&
+          event.pairs.length >= 2 && (
           <AutoSchedulePanel
             pairCount={event.pairs.length}
             courts={event.courts}
@@ -1485,6 +1571,7 @@ export function EventPage() {
         )}
 
         {scheduleCreateMode === 'manual' &&
+          !event.scheduleLocked &&
           event.courts.length > 0 &&
           event.pairs.length >= 2 && (
             <ManualSchedulePanel
@@ -1585,13 +1672,15 @@ export function EventPage() {
                                   </span>
                                 )}
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteGroupMatch(match.id)}
-                                className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                              >
-                                Xóa
-                              </button>
+                              {!event.scheduleLocked && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteGroupMatch(match.id)}
+                                  className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                                >
+                                  Xóa
+                                </button>
+                              )}
                             </div>
 
                             <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-stretch gap-2">

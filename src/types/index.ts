@@ -71,6 +71,8 @@ export interface PickleballEvent {
   pairsLocked?: boolean
   /** Chốt phân bảng — không đổi bảng đấu */
   groupsLocked?: boolean
+  /** Chốt lịch vòng bảng — không thêm/xóa sân hay thay đổi lịch */
+  scheduleLocked?: boolean
   courts: number[]
   matches: Match[]
   /** Số beer cống hiến từng người (participantId → amount) — mini game, dùng cho BXH */

@@ -1,8 +1,9 @@
 import { allPairsAssignedToGroups } from './groups'
+import { filterGroupMatches } from './matches'
 import { verifySettingsPassword } from './settingsAccess'
 import type { PickleballEvent } from '../types'
 
-export type SetupLockKey = 'participants' | 'pairs' | 'groups'
+export type SetupLockKey = 'participants' | 'pairs' | 'groups' | 'schedule'
 
 /** Mật khẩu event nếu có; không thì mật khẩu tab Cài đặt (nội bộ CLB). */
 export function verifySetupLockPassword(
@@ -18,7 +19,8 @@ export function verifySetupLockPassword(
 export function isSetupLocked(event: PickleballEvent, key: SetupLockKey): boolean {
   if (key === 'participants') return event.participantsLocked === true
   if (key === 'pairs') return event.pairsLocked === true
-  return event.groupsLocked === true
+  if (key === 'groups') return event.groupsLocked === true
+  return event.scheduleLocked === true
 }
 
 export function getSetupLockBlockReason(
@@ -46,14 +48,30 @@ export function getSetupLockBlockReason(
     return null
   }
 
+  if (key === 'groups') {
+    if (!event.pairsLocked) {
+      return 'Hãy chốt cặp đôi trước.'
+    }
+    if (!event.splitGroups) {
+      return 'Bật chia bảng đấu và phân bảng xong trước khi chốt.'
+    }
+    if (!allPairsAssignedToGroups(event.pairs, event.groupCount)) {
+      return 'Còn cặp chưa phân bảng — hãy phân hết trước khi chốt.'
+    }
+    return null
+  }
+
   if (!event.pairsLocked) {
     return 'Hãy chốt cặp đôi trước.'
   }
-  if (!event.splitGroups) {
-    return 'Bật chia bảng đấu và phân bảng xong trước khi chốt.'
+  if (event.splitGroups && !event.groupsLocked) {
+    return 'Hãy chốt bảng đấu trước.'
   }
-  if (!allPairsAssignedToGroups(event.pairs, event.groupCount)) {
-    return 'Còn cặp chưa phân bảng — hãy phân hết trước khi chốt.'
+  if (event.courts.length === 0) {
+    return 'Cần có ít nhất một sân thi đấu.'
+  }
+  if (filterGroupMatches(event.matches).length === 0) {
+    return 'Cần có lịch vòng bảng trước khi chốt.'
   }
   return null
 }
@@ -79,10 +97,18 @@ export function getSetupLockConfirmMessage(
         confirmLabel: 'Chốt',
       }
     }
+    if (key === 'groups') {
+      return {
+        title: 'Chốt bảng đấu',
+        message:
+          'Sau khi chốt, không thể bật/tắt chia bảng hay đổi bảng của từng cặp. Nhập mật khẩu để xác nhận.',
+        confirmLabel: 'Chốt',
+      }
+    }
     return {
-      title: 'Chốt bảng đấu',
+      title: 'Chốt lịch thi đấu',
       message:
-        'Sau khi chốt, không thể bật/tắt chia bảng hay đổi bảng của từng cặp. Nhập mật khẩu để xác nhận.',
+        'Sau khi chốt, không thể thêm/xóa sân, tạo lại hay xóa trận vòng bảng. Nhập kết quả vẫn được. Nhập mật khẩu để xác nhận.',
       confirmLabel: 'Chốt',
     }
   }
@@ -91,7 +117,7 @@ export function getSetupLockConfirmMessage(
     return {
       title: 'Mở khóa người tham gia',
       message:
-        'Mở khóa sẽ cho phép chỉnh sửa người tham gia, cặp đôi và bảng đấu. Nhập mật khẩu để xác nhận.',
+        'Mở khóa sẽ cho phép chỉnh sửa người tham gia, cặp đôi, bảng đấu và lịch thi đấu. Nhập mật khẩu để xác nhận.',
       confirmLabel: 'Mở khóa',
     }
   }
@@ -99,13 +125,22 @@ export function getSetupLockConfirmMessage(
     return {
       title: 'Mở khóa cặp đôi',
       message:
-        'Mở khóa sẽ cho phép chỉnh sửa cặp đôi và bảng đấu. Nhập mật khẩu để xác nhận.',
+        'Mở khóa sẽ cho phép chỉnh sửa cặp đôi, bảng đấu và lịch thi đấu. Nhập mật khẩu để xác nhận.',
+      confirmLabel: 'Mở khóa',
+    }
+  }
+  if (key === 'groups') {
+    return {
+      title: 'Mở khóa bảng đấu',
+      message:
+        'Mở khóa sẽ cho phép thay đổi phân bảng và lịch thi đấu. Nhập mật khẩu để xác nhận.',
       confirmLabel: 'Mở khóa',
     }
   }
   return {
-    title: 'Mở khóa bảng đấu',
-    message: 'Mở khóa sẽ cho phép thay đổi phân bảng. Nhập mật khẩu để xác nhận.',
+    title: 'Mở khóa lịch thi đấu',
+    message:
+      'Mở khóa sẽ cho phép thêm/xóa sân, tạo lại và xóa trận vòng bảng. Nhập mật khẩu để xác nhận.',
     confirmLabel: 'Mở khóa',
   }
 }
@@ -120,6 +155,7 @@ export function applySetupUnlock(
       participantsLocked: false,
       pairsLocked: false,
       groupsLocked: false,
+      scheduleLocked: false,
     }
   }
   if (key === 'pairs') {
@@ -127,9 +163,17 @@ export function applySetupUnlock(
       ...event,
       pairsLocked: false,
       groupsLocked: false,
+      scheduleLocked: false,
     }
   }
-  return { ...event, groupsLocked: false }
+  if (key === 'groups') {
+    return {
+      ...event,
+      groupsLocked: false,
+      scheduleLocked: false,
+    }
+  }
+  return { ...event, scheduleLocked: false }
 }
 
 export function applySetupLock(
@@ -142,5 +186,8 @@ export function applySetupLock(
   if (key === 'pairs') {
     return { ...event, pairsLocked: true }
   }
-  return { ...event, groupsLocked: true }
+  if (key === 'groups') {
+    return { ...event, groupsLocked: true }
+  }
+  return { ...event, scheduleLocked: true }
 }
