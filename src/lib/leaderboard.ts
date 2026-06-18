@@ -1,12 +1,14 @@
 import {
   buildPlayerContributionStats,
   type ContributionStanding,
+  type LeaderboardSource,
   type PlayerContributionStats,
 } from './contributionStandings'
 import type { PickleballEvent } from '../types'
 
 export type LeaderboardPeriod = 'today' | 'week' | 'month' | 'all'
 export type LeaderboardMetric = 'earnings' | 'wins' | 'matches' | 'contribution'
+export type { LeaderboardSource } from './contributionStandings'
 
 export interface LeaderboardStanding extends ContributionStanding {
   trend: number | null
@@ -15,6 +17,7 @@ export interface LeaderboardStanding extends ContributionStanding {
 export interface LeaderboardOptions {
   period: LeaderboardPeriod
   metric: LeaderboardMetric
+  source?: LeaderboardSource
   now?: Date
 }
 
@@ -101,16 +104,44 @@ export function getPreviousPeriodRange(
 function filterEventsByRange(
   events: PickleballEvent[],
   range: DateRange | null,
+  source: LeaderboardSource,
 ): PickleballEvent[] {
-  if (!range) return events
-  return events.filter((event) => {
+  const byType = events.filter((event) =>
+    source === 'showmatch' ? event.eventType === 'showmatch' : event.eventType !== 'showmatch',
+  )
+
+  if (!range) return byType
+
+  if (source === 'showmatch') {
+    return byType
+      .map((event) => ({
+        ...event,
+        matches: event.matches.filter((match) => {
+          const dateStr = match.scheduledAt ?? event.createdAt
+          const date = new Date(dateStr)
+          if (Number.isNaN(date.getTime())) return false
+          return date >= range.start && date <= range.end
+        }),
+      }))
+      .filter((event) => event.matches.length > 0)
+  }
+
+  return byType.filter((event) => {
     const created = new Date(event.createdAt)
     if (Number.isNaN(created.getTime())) return false
     return created >= range.start && created <= range.end
   })
 }
 
-function metricValue(row: PlayerContributionStats, metric: LeaderboardMetric): number {
+function contributionCount(row: PlayerContributionStats, source: LeaderboardSource): number {
+  return source === 'showmatch' ? row.contributionMatchIds.size : row.contributionEventIds.size
+}
+
+function metricValue(
+  row: PlayerContributionStats,
+  metric: LeaderboardMetric,
+  source: LeaderboardSource,
+): number {
   switch (metric) {
     case 'earnings':
       return row.totalAmount
@@ -119,22 +150,27 @@ function metricValue(row: PlayerContributionStats, metric: LeaderboardMetric): n
     case 'matches':
       return row.matchesPlayed
     case 'contribution':
-      return row.contributionEventIds.size
+      return contributionCount(row, source)
   }
 }
 
-function rowQualifies(row: PlayerContributionStats, metric: LeaderboardMetric): boolean {
-  return metricValue(row, metric) > 0
+function rowQualifies(
+  row: PlayerContributionStats,
+  metric: LeaderboardMetric,
+  source: LeaderboardSource,
+): boolean {
+  return metricValue(row, metric, source) > 0
 }
 
 function sortRows(
   rows: PlayerContributionStats[],
   metric: LeaderboardMetric,
+  source: LeaderboardSource,
 ): Omit<ContributionStanding, 'rank'>[] {
   const sorted = [...rows]
-    .filter((row) => rowQualifies(row, metric))
+    .filter((row) => rowQualifies(row, metric, source))
     .sort((a, b) => {
-      const diff = metricValue(b, metric) - metricValue(a, metric)
+      const diff = metricValue(b, metric, source) - metricValue(a, metric, source)
       if (diff !== 0) return diff
       if (b.totalAmount !== a.totalAmount) return b.totalAmount - a.totalAmount
       if (b.wins !== a.wins) return b.wins - a.wins
@@ -144,7 +180,7 @@ function sortRows(
   return sorted.map((row) => ({
     name: row.displayName,
     totalAmount: row.totalAmount,
-    eventsContributed: row.contributionEventIds.size,
+    eventsContributed: contributionCount(row, source),
     matchesPlayed: row.matchesPlayed,
     wins: row.wins,
   }))
@@ -208,16 +244,17 @@ export function calculateLeaderboardStandings(
   options: LeaderboardOptions,
 ): LeaderboardStanding[] {
   const now = options.now ?? new Date()
+  const source = options.source ?? 'tournament'
   const range = getPeriodRange(options.period, now)
-  const filtered = filterEventsByRange(events, range)
-  const stats = buildPlayerContributionStats(filtered)
-  const rows = sortRows(stats, options.metric)
+  const filtered = filterEventsByRange(events, range, source)
+  const stats = buildPlayerContributionStats(filtered, source)
+  const rows = sortRows(stats, options.metric, source)
   const standings = assignRanksByMetric(rows, options.metric)
 
   const previousRange = getPreviousPeriodRange(options.period, now)
-  const previousFiltered = filterEventsByRange(events, previousRange)
-  const previousStats = buildPlayerContributionStats(previousFiltered)
-  const previousRows = sortRows(previousStats, options.metric)
+  const previousFiltered = filterEventsByRange(events, previousRange, source)
+  const previousStats = buildPlayerContributionStats(previousFiltered, source)
+  const previousRows = sortRows(previousStats, options.metric, source)
   const previousStandings = assignRanksByMetric(previousRows, options.metric)
   const previousRankByName = new Map(previousStandings.map((row) => [row.name, row.rank]))
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ContributionDialog } from '../components/ContributionDialog'
 import { ShowmatchEditDialog } from '../components/ShowmatchEditDialog'
 import { ShowmatchResultDialog } from '../components/ShowmatchResultDialog'
 import { ShowMatchSection } from '../components/ShowMatchSection'
@@ -29,6 +30,7 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [matchToDelete, setMatchToDelete] = useState<string | null>(null)
+  const [beerMatch, setBeerMatch] = useState<Match | null>(null)
   const [createFormVisible, setCreateFormVisible] = useState(true)
 
   const showMatches = useMemo(() => filterShowMatches(event.matches), [event.matches])
@@ -194,6 +196,33 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
     })
   }
 
+  const beerMatchParticipants = useMemo(() => {
+    if (!beerMatch) return []
+    const pair1 = event.pairs.find((p) => p.id === beerMatch.pair1Id)
+    const pair2 = event.pairs.find((p) => p.id === beerMatch.pair2Id)
+    if (!pair1 || !pair2) return []
+
+    return [pair1.player1Id, pair1.player2Id, pair2.player1Id, pair2.player2Id]
+      .map((id) => event.participants.find((p) => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+  }, [beerMatch, event.pairs, event.participants])
+
+  const handleSaveMatchBeer = (contributions: Record<string, number> | undefined) => {
+    if (!beerMatch) return
+    onPersist({
+      ...event,
+      matches: event.matches.map((m) => {
+        if (m.id !== beerMatch.id) return m
+        if (!contributions) {
+          const { participantContributions: _, ...rest } = m
+          return rest
+        }
+        return { ...m, participantContributions: contributions }
+      }),
+    })
+    setBeerMatch(null)
+  }
+
   const handleStartEditEventName = () => {
     setEventNameInput(event.name)
     setIsEditingEventName(true)
@@ -255,6 +284,7 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
             onDeleteMatch={handleDeleteShowMatch}
             onEditMatch={setEditingMatch}
             onUpdateResult={setSelectedMatch}
+            onEditBeer={setBeerMatch}
           />
         </div>
       </div>
@@ -313,6 +343,14 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
         onSubmit={(games) => {
           if (selectedMatch) handleUpdateShowmatchResult(selectedMatch.id, games)
         }}
+      />
+
+      <ContributionDialog
+        open={!!beerMatch}
+        participants={beerMatchParticipants}
+        participantContributions={beerMatch?.participantContributions}
+        onClose={() => setBeerMatch(null)}
+        onSave={handleSaveMatchBeer}
       />
     </div>
   )

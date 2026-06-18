@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import type { ContributionHistoryEntry } from '../lib/contributionStandings'
-import { formatContributionAmount } from '../lib/contributionMoney'
+import type { ContributionHistoryEntry, LeaderboardSource } from '../lib/contributionStandings'
 import { getPlayerAvatarColor, getPlayerInitials } from '../lib/clubPlayers'
+import { ContributionAmount } from './leaderboard/ContributionCompactAmount'
 
 interface ContributionHistoryDialogProps {
   open: boolean
@@ -9,6 +9,7 @@ interface ContributionHistoryDialogProps {
   rank?: number
   totalAmount: number
   history: ContributionHistoryEntry[]
+  source?: LeaderboardSource
   onClose: () => void
 }
 
@@ -18,6 +19,7 @@ export function ContributionHistoryDialog({
   rank,
   totalAmount,
   history,
+  source = 'tournament',
   onClose,
 }: ContributionHistoryDialogProps) {
   if (!open) return null
@@ -37,7 +39,7 @@ export function ContributionHistoryDialog({
               <h3 className="truncate text-lg font-semibold text-neutral-900">{playerName}</h3>
               <p className="text-sm text-neutral-500">
                 {rank !== undefined ? `Hạng ${rank} · ` : ''}
-                Tổng {formatContributionAmount(totalAmount)}
+                Tổng <ContributionAmount amount={totalAmount} compact={false} iconClassName="h-4 w-4" />
               </p>
             </div>
           </div>
@@ -45,15 +47,15 @@ export function ContributionHistoryDialog({
 
         <div className="overflow-y-auto px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Lịch sử cống hiến
+            Lịch sử beer
           </p>
 
           {history.length === 0 ? (
-            <p className="mt-4 text-center text-sm text-neutral-400">Chưa có lịch sử cống hiến.</p>
+            <p className="mt-4 text-center text-sm text-neutral-400">Chưa có lịch sử beer.</p>
           ) : (
             <ul className="mt-3 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
               {history.map((entry) => (
-                <li key={entry.eventId} className="px-4 py-3">
+                <li key={entry.matchId ?? entry.eventId} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <Link
@@ -61,7 +63,7 @@ export function ContributionHistoryDialog({
                         onClick={onClose}
                         className="text-sm font-medium text-primary-600 hover:underline"
                       >
-                        {entry.eventName}
+                        {entry.matchName ? `${entry.matchName} · ${entry.eventName}` : entry.eventName}
                       </Link>
                       <p className="mt-0.5 text-xs text-neutral-500">
                         {new Date(entry.eventDate).toLocaleDateString('vi-VN', {
@@ -71,9 +73,12 @@ export function ContributionHistoryDialog({
                         })}
                       </p>
                     </div>
-                    <span className="shrink-0 text-sm font-bold text-neutral-900">
-                      {formatContributionAmount(entry.amount)}
-                    </span>
+                    <ContributionAmount
+                      amount={entry.amount}
+                      compact={false}
+                      iconClassName="h-4 w-4"
+                      className="shrink-0 text-sm font-bold text-neutral-900"
+                    />
                   </div>
                 </li>
               ))}
@@ -83,9 +88,12 @@ export function ContributionHistoryDialog({
 
         <div className="border-t border-neutral-100 px-5 py-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-neutral-600">{history.length} mini game</span>
+            <span className="text-neutral-600">
+              {history.length}{' '}
+              {source === 'showmatch' ? 'trận showmatch' : 'mini game'}
+            </span>
             <span className="font-semibold text-neutral-900">
-              Tổng: {formatContributionAmount(totalAmount)}
+              Tổng: <ContributionAmount amount={totalAmount} compact={false} iconClassName="h-4 w-4" />
             </span>
           </div>
           <div className="mt-4 flex justify-end">

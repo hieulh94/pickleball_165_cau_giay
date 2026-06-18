@@ -14,6 +14,7 @@ import {
   formatGameScoresDetail,
   getShowmatchGamesWon,
 } from '../lib/showmatchScoring'
+import { ContributionAmount } from './leaderboard/ContributionCompactAmount'
 import type { Match, Pair, Participant } from '../types'
 
 const SHOWMATCH_NAME_PRESETS = ['Showmatch 1', 'Showmatch 2', 'Trận khai mạc']
@@ -50,6 +51,11 @@ function PairMiniCard({
   )
 }
 
+function getMatchBeerTotal(match: Match): number {
+  if (!match.participantContributions) return 0
+  return Object.values(match.participantContributions).reduce((sum, amount) => sum + amount, 0)
+}
+
 function ShowMatchCard({
   match,
   pairs,
@@ -58,6 +64,7 @@ function ShowMatchCard({
   onDeleteMatch,
   onEditMatch,
   onUpdateResult,
+  onEditBeer,
 }: {
   match: Match
   pairs: Pair[]
@@ -66,6 +73,7 @@ function ShowMatchCard({
   onDeleteMatch: (matchId: string) => void
   onEditMatch: (match: Match) => void
   onUpdateResult: (match: Match) => void
+  onEditBeer: (match: Match) => void
 }) {
   const editable = canEditShowmatchInfo(match)
   const pair1 = pairs.find((p) => p.id === match.pair1Id)
@@ -75,6 +83,7 @@ function ShowMatchCard({
   const gamesWon = getShowmatchGamesWon(match)
   const gameDetail =
     match.games && match.games.length > 0 ? formatGameScoresDetail(match.games) : null
+  const beerTotal = getMatchBeerTotal(match)
 
   return (
     <div
@@ -137,7 +146,21 @@ function ShowMatchCard({
         </div>
       )}
 
-      <div className={`mt-2 grid gap-2 ${editable ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      {beerTotal > 0 && (
+        <p className="mt-2 text-center text-xs font-medium text-secondary-700">
+          Beer cống hiến:{' '}
+          <ContributionAmount amount={beerTotal} compact={false} iconClassName="h-4 w-4" />
+        </p>
+      )}
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => onEditBeer(match)}
+          className="rounded-lg border border-secondary-300 bg-secondary-50 py-2.5 text-sm font-semibold text-secondary-800 hover:bg-secondary-100"
+        >
+          {beerTotal > 0 ? 'Sửa beer' : 'Beer cống hiến'}
+        </button>
         {editable && (
           <button
             type="button"
@@ -150,7 +173,7 @@ function ShowMatchCard({
         <button
           type="button"
           onClick={() => onUpdateResult(match)}
-          className="rounded-lg border border-primary-300 bg-primary-50 py-2.5 text-sm font-semibold text-primary-800 hover:bg-primary-50"
+          className={`rounded-lg border border-primary-300 bg-primary-50 py-2.5 text-sm font-semibold text-primary-800 hover:bg-primary-50 ${editable ? '' : 'sm:col-span-2'}`}
         >
           {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
         </button>
@@ -169,6 +192,7 @@ function ShowmatchWeekBlock({
   onDeleteMatch,
   onEditMatch,
   onUpdateResult,
+  onEditBeer,
 }: {
   group: ShowmatchWeekGroup
   expanded: boolean
@@ -179,6 +203,7 @@ function ShowmatchWeekBlock({
   onDeleteMatch: (matchId: string) => void
   onEditMatch: (match: Match) => void
   onUpdateResult: (match: Match) => void
+  onEditBeer: (match: Match) => void
 }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
@@ -228,6 +253,7 @@ function ShowmatchWeekBlock({
                 onDeleteMatch={onDeleteMatch}
                 onEditMatch={onEditMatch}
                 onUpdateResult={onUpdateResult}
+                onEditBeer={onEditBeer}
               />
             ))}
           </div>
@@ -255,6 +281,7 @@ interface ShowMatchSectionProps {
   onDeleteMatch: (matchId: string) => void
   onEditMatch: (match: Match) => void
   onUpdateResult: (match: Match) => void
+  onEditBeer: (match: Match) => void
 }
 
 export function ShowMatchSection({
@@ -268,6 +295,7 @@ export function ShowMatchSection({
   onDeleteMatch,
   onEditMatch,
   onUpdateResult,
+  onEditBeer,
 }: ShowMatchSectionProps) {
   const today = new Date().toISOString().slice(0, 10)
   const [name, setName] = useState('')
@@ -464,6 +492,7 @@ export function ShowMatchSection({
               onDeleteMatch={onDeleteMatch}
               onEditMatch={onEditMatch}
               onUpdateResult={onUpdateResult}
+              onEditBeer={onEditBeer}
             />
           ))}
           </div>

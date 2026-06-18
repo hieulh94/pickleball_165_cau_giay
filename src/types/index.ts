@@ -46,6 +46,8 @@ export interface Match {
   score1?: number
   score2?: number
   completed: boolean
+  /** Beer cống hiến từng người trong trận (participantId → amount) — showmatch */
+  participantContributions?: Record<string, number>
 }
 
 export type EventType = 'tournament' | 'showmatch'
@@ -65,6 +67,6 @@ export interface PickleballEvent {
   groupCount?: number
   courts: number[]
   matches: Match[]
-  /** Số tiền cống hiến từng người (participantId → VND) — mini game, dùng cho BXH */
+  /** Số beer cống hiến từng người (participantId → amount) — mini game, dùng cho BXH */
   participantContributions?: Record<string, number>
 }

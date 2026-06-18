@@ -9,6 +9,7 @@ import {
   getStandingMetricValue,
   type LeaderboardMetric,
   type LeaderboardPeriod,
+  type LeaderboardSource,
   type LeaderboardStanding,
 } from '../lib/leaderboard'
 import { isFirebaseConfigured } from '../lib/firebase'
@@ -21,6 +22,7 @@ export function ContributionLeaderboardPanel() {
   const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardStanding | null>(null)
   const [period, setPeriod] = useState<LeaderboardPeriod>('all')
   const [metric, setMetric] = useState<LeaderboardMetric>('earnings')
+  const [source, setSource] = useState<LeaderboardSource>('tournament')
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
@@ -35,8 +37,8 @@ export function ContributionLeaderboardPanel() {
   }, [])
 
   const standings = useMemo(
-    () => calculateLeaderboardStandings(events, { period, metric }),
-    [events, period, metric],
+    () => calculateLeaderboardStandings(events, { period, metric, source }),
+    [events, period, metric, source],
   )
 
   const maxMetricValue = useMemo(
@@ -45,12 +47,12 @@ export function ContributionLeaderboardPanel() {
   )
 
   const podiumStandings = standings.slice(0, 3)
-  const listStandings = standings.slice(3)
+  const listStandings = standings
 
   const selectedHistory = useMemo(() => {
     if (!selectedPlayer) return []
-    return getPlayerContributionHistory(events, selectedPlayer.name)
-  }, [events, selectedPlayer])
+    return getPlayerContributionHistory(events, selectedPlayer.name, source)
+  }, [events, selectedPlayer, source])
 
   if (!isFirebaseConfigured()) return null
 
@@ -60,8 +62,10 @@ export function ContributionLeaderboardPanel() {
         <LeaderboardFilters
           period={period}
           metric={metric}
+          source={source}
           onPeriodChange={setPeriod}
           onMetricChange={setMetric}
+          onSourceChange={setSource}
         />
       </div>
 
@@ -69,8 +73,8 @@ export function ContributionLeaderboardPanel() {
         <p className="px-4 py-10 text-center text-sm text-text-secondary">Đang tải bảng xếp hạng...</p>
       ) : standings.length === 0 ? (
         <p className="mx-4 mt-2 rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-text-secondary">
-          Chưa có dữ liệu cho bộ lọc này. Nhập tiền nộp/người ở mini game hoặc chọn khoảng thời gian
-          khác.
+          Chưa có dữ liệu cho bộ lọc này. Nhập beer nộp/người ở{' '}
+          {source === 'showmatch' ? 'trận showmatch' : 'mini game'} hoặc chọn khoảng thời gian khác.
         </p>
       ) : (
         <>
@@ -79,28 +83,24 @@ export function ContributionLeaderboardPanel() {
               <LeaderboardPodium
                 standings={podiumStandings}
                 metric={metric}
+                source={source}
                 onSelect={setSelectedPlayer}
               />
             </div>
 
             <div className="pt-3">
-              {listStandings.length > 0 ? (
-                <ul className="space-y-3">
-                  {listStandings.map((row) => (
-                    <LeaderboardRow
-                      key={row.name}
-                      row={row}
-                      metric={metric}
-                      maxMetricValue={maxMetricValue}
-                      onSelect={setSelectedPlayer}
-                    />
-                  ))}
-                </ul>
-              ) : (
-                <p className="rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm text-text-secondary">
-                  Chỉ có top 3 trong bộ lọc này.
-                </p>
-              )}
+              <ul className="space-y-3">
+                {listStandings.map((row) => (
+                  <LeaderboardRow
+                    key={row.name}
+                    row={row}
+                    metric={metric}
+                    source={source}
+                    maxMetricValue={maxMetricValue}
+                    onSelect={setSelectedPlayer}
+                  />
+                ))}
+              </ul>
             </div>
           </div>
 
@@ -110,6 +110,7 @@ export function ContributionLeaderboardPanel() {
             rank={selectedPlayer?.rank}
             totalAmount={selectedPlayer?.totalAmount ?? 0}
             history={selectedHistory}
+            source={source}
             onClose={() => setSelectedPlayer(null)}
           />
         </>

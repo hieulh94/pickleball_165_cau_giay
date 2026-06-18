@@ -71,10 +71,24 @@ function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
 
 function migrateMatch(match: Match): Match {
   if (match.phase !== 'showmatch') return match
+  let migrated: Match = match
   if (match.showmatchFormat !== 'best_of_3') {
-    return { ...match, showmatchFormat: 'best_of_3' }
+    migrated = { ...migrated, showmatchFormat: 'best_of_3' }
   }
-  return match
+  if (migrated.participantContributions) {
+    const cleaned = Object.fromEntries(
+      Object.entries(migrated.participantContributions).filter(
+        ([, amount]) => typeof amount === 'number' && amount > 0,
+      ),
+    )
+    if (Object.keys(cleaned).length === 0) {
+      const { participantContributions: _, ...rest } = migrated
+      migrated = rest as Match
+    } else {
+      migrated = { ...migrated, participantContributions: cleaned }
+    }
+  }
+  return migrated
 }
 
 function docToEvent(id: string, data: Record<string, unknown>): PickleballEvent {

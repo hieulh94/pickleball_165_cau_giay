@@ -81,7 +81,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   schedule: 'Lịch thi đấu',
   standings: 'Bảng xếp hạng',
   playoffs: 'Vòng loại trực tiếp',
-  contribution: 'Tiền cống hiến',
+  contribution: 'Beer cống hiến',
 }
 
 export const DEFAULT_SECTION_VISIBILITY: Record<SectionKey, boolean> = {

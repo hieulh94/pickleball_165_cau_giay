@@ -74,7 +74,7 @@ export function Layout() {
                     Bảng xếp hạng
                   </h1>
                   <p className="mt-0.5 text-[10px] leading-snug text-text-secondary sm:text-xs">
-                    Theo dõi cống hiến, trận đấu và thành tích CLB
+                    Theo dõi beer, trận đấu và thành tích CLB
                   </p>
                 </div>
 

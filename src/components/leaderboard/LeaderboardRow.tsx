@@ -1,38 +1,43 @@
 import {
-  formatContributionAmount,
-  formatContributionAmountCompact,
-} from '../../lib/contributionMoney'
-import {
   getStandingMetricValue,
   type LeaderboardMetric,
+  type LeaderboardSource,
   type LeaderboardStanding,
 } from '../../lib/leaderboard'
 import { cn } from '../../lib/cn'
+import { ContributionAmount } from './ContributionCompactAmount'
 import { LeaderboardProgressBar } from './LeaderboardProgressBar'
 import { PlayerAvatar, PlayerStats } from './LeaderboardPodium'
 import { LargeRankBadge, RankTrendBadge } from './RankTrendBadge'
 
-function formatMetricValue(row: LeaderboardStanding, metric: LeaderboardMetric): string {
+function formatMetricLabel(
+  row: LeaderboardStanding,
+  metric: LeaderboardMetric,
+  source: LeaderboardSource,
+): string | null {
   switch (metric) {
     case 'earnings':
-      return formatContributionAmount(row.totalAmount)
+      return null
     case 'wins':
       return `${row.wins} thắng`
     case 'matches':
       return `${row.matchesPlayed} trận`
     case 'contribution':
-      return `${row.eventsContributed} mini game`
+      return source === 'showmatch'
+        ? `${row.eventsContributed} trận SM`
+        : `${row.eventsContributed} mini game`
   }
 }
 
 interface LeaderboardRowProps {
   row: LeaderboardStanding
   metric: LeaderboardMetric
+  source: LeaderboardSource
   maxMetricValue: number
   onSelect: (row: LeaderboardStanding) => void
 }
 
-export function LeaderboardRow({ row, metric, maxMetricValue, onSelect }: LeaderboardRowProps) {
+export function LeaderboardRow({ row, metric, source, maxMetricValue, onSelect }: LeaderboardRowProps) {
   const metricValue = getStandingMetricValue(row, metric)
 
   return (
@@ -58,7 +63,7 @@ export function LeaderboardRow({ row, metric, maxMetricValue, onSelect }: Leader
             <p className="truncate text-sm font-bold uppercase tracking-wide text-text-primary sm:text-base">
               {row.name}
             </p>
-            <PlayerStats row={row} />
+            <PlayerStats row={row} source={source} />
             <div className="mt-2 sm:hidden">
               <LeaderboardProgressBar value={metricValue} max={maxMetricValue} />
             </div>
@@ -70,12 +75,23 @@ export function LeaderboardRow({ row, metric, maxMetricValue, onSelect }: Leader
             <LeaderboardProgressBar value={metricValue} max={maxMetricValue} />
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold tabular-nums text-text-primary">
-              {formatMetricValue(row, metric)}
-            </p>
+            {metric === 'earnings' ? (
+              <ContributionAmount
+                amount={row.totalAmount}
+                iconClassName="h-6 w-6 sm:h-7 sm:w-7"
+                className="text-xl font-bold text-text-primary"
+              />
+            ) : (
+              <p className="text-xl font-bold tabular-nums text-text-primary">
+                {formatMetricLabel(row, metric, source)}
+              </p>
+            )}
             {metric !== 'earnings' && row.totalAmount > 0 && (
               <p className="text-xs text-text-secondary">
-                {formatContributionAmountCompact(row.totalAmount)}
+                <ContributionAmount
+                  amount={row.totalAmount}
+                  iconClassName="h-6 w-6 sm:h-7 sm:w-7"
+                />
               </p>
             )}
           </div>

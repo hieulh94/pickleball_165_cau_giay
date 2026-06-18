@@ -1,10 +1,7 @@
 import { getPlayerAvatarColor, getPlayerInitials } from '../../lib/clubPlayers'
-import {
-  formatContributionAmount,
-  formatContributionAmountCompact,
-} from '../../lib/contributionMoney'
-import type { LeaderboardMetric, LeaderboardStanding } from '../../lib/leaderboard'
+import type { LeaderboardMetric, LeaderboardSource, LeaderboardStanding } from '../../lib/leaderboard'
 import { cn } from '../../lib/cn'
+import { ContributionAmount } from './ContributionCompactAmount'
 
 function PlayerAvatar({ name, size = 'lg' }: { name: string; size?: 'md' | 'lg' | 'xl' }) {
   const sizeClass =
@@ -27,16 +24,23 @@ function PlayerAvatar({ name, size = 'lg' }: { name: string; size?: 'md' | 'lg' 
   )
 }
 
-function PlayerStats({ row }: { row: LeaderboardStanding }) {
+function contributionLabel(count: number, source: LeaderboardSource): string {
+  if (source === 'showmatch') {
+    return `${count} trận SM`
+  }
+  return `${count} mini game`
+}
+
+function PlayerStats({ row, source }: { row: LeaderboardStanding; source: LeaderboardSource }) {
   return (
     <>
       <p className="mt-0.5 text-[10px] text-text-secondary sm:hidden">
-        🎾 {row.matchesPlayed} · 🎮 {row.eventsContributed}
+        🎾 {row.matchesPlayed} · {source === 'showmatch' ? '⭐' : '🎮'} {row.eventsContributed}
       </p>
       <div className="mt-1 hidden flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-text-secondary sm:flex">
         <span>🎾 {row.matchesPlayed} trận</span>
         <span>
-          🎮 {row.eventsContributed} mini game{row.eventsContributed !== 1 ? '' : ''}
+          {source === 'showmatch' ? '⭐' : '🎮'} {contributionLabel(row.eventsContributed, source)}
         </span>
         {row.wins > 0 && <span>🏆 {row.wins} thắng</span>}
       </div>
@@ -71,16 +75,20 @@ const PODIUM_STYLES = {
   },
 } as const
 
-function formatPodiumMetric(row: LeaderboardStanding, metric: LeaderboardMetric): string {
+function formatPodiumMetric(
+  row: LeaderboardStanding,
+  metric: LeaderboardMetric,
+  source: LeaderboardSource,
+) {
   switch (metric) {
     case 'earnings':
-      return formatContributionAmountCompact(row.totalAmount)
+      return null
     case 'wins':
       return `${row.wins} thắng`
     case 'matches':
       return `${row.matchesPlayed} trận`
     case 'contribution':
-      return `${row.eventsContributed} mini game`
+      return contributionLabel(row.eventsContributed, source)
   }
 }
 
@@ -88,11 +96,13 @@ function PodiumSlot({
   row,
   place,
   metric,
+  source,
   onSelect,
 }: {
   row: LeaderboardStanding | undefined
   place: 1 | 2 | 3
   metric: LeaderboardMetric
+  source: LeaderboardSource
   onSelect: (row: LeaderboardStanding) => void
 }) {
   const styles = PODIUM_STYLES[place]
@@ -141,14 +151,17 @@ function PodiumSlot({
             </span>
           )}
           <p className={cn('mt-1 font-bold tabular-nums text-text-primary sm:mt-2', styles.amount)}>
-            {row ? formatPodiumMetric(row, metric) : '—'}
+            {metric === 'earnings' ? (
+              <ContributionAmount
+                amount={row.totalAmount}
+                iconClassName={place === 1 ? 'h-8 w-8 sm:h-11 sm:w-11' : 'h-7 w-7 sm:h-9 sm:w-9'}
+                className={styles.amount}
+              />
+            ) : (
+              formatPodiumMetric(row, metric, source)
+            )}
           </p>
-          {metric === 'earnings' && row.totalAmount > 0 && (
-            <p className="hidden text-[10px] text-text-secondary sm:block">
-              {formatContributionAmount(row.totalAmount)}
-            </p>
-          )}
-          <PlayerStats row={row} />
+          <PlayerStats row={row} source={source} />
         </div>
       </div>
     </button>
@@ -158,21 +171,23 @@ function PodiumSlot({
 export function LeaderboardPodium({
   standings,
   metric,
+  source,
   onSelect,
 }: {
   standings: LeaderboardStanding[]
   metric: LeaderboardMetric
+  source: LeaderboardSource
   onSelect: (row: LeaderboardStanding) => void
 }) {
   const [first, second, third] = standings
 
   return (
     <div className="flex items-end justify-center gap-1.5 px-1 pb-2 pt-2 sm:gap-3 sm:pt-4">
-      <PodiumSlot row={second} place={2} metric={metric} onSelect={onSelect} />
-      <PodiumSlot row={first} place={1} metric={metric} onSelect={onSelect} />
-      <PodiumSlot row={third} place={3} metric={metric} onSelect={onSelect} />
+      <PodiumSlot row={second} place={2} metric={metric} source={source} onSelect={onSelect} />
+      <PodiumSlot row={first} place={1} metric={metric} source={source} onSelect={onSelect} />
+      <PodiumSlot row={third} place={3} metric={metric} source={source} onSelect={onSelect} />
     </div>
   )
 }
 
-export { PlayerAvatar, PlayerStats, formatContributionAmount }
+export { PlayerAvatar, PlayerStats }
