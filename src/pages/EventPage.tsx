@@ -1250,7 +1250,7 @@ export function EventPage() {
         description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
         headerExtra={
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SectionLockButton
               locked={event.pairsLocked === true}
               disabled={!event.pairsLocked && !!pairsLockBlockReason}
@@ -1258,7 +1258,7 @@ export function EventPage() {
               onClick={() => requestSetupLockToggle('pairs')}
             />
             <label
-              className={`flex items-center gap-2 ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap ${
                 event.groupsLocked || event.pairsLocked || event.scheduleLocked
                   ? 'cursor-not-allowed opacity-60'
                   : 'cursor-pointer'

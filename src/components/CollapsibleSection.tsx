@@ -33,8 +33,8 @@ export function CollapsibleSection({
         className ?? 'mt-0',
       )}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 w-full sm:flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[22px] font-semibold leading-tight text-text-primary">{title}</h2>
             {!visible && onToggle && (
@@ -44,22 +44,24 @@ export function CollapsibleSection({
             )}
           </div>
           {description && visible && (
-            <p className="mt-0.5 text-xs text-text-secondary">{description}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{description}</p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {headerExtra}
-          {onToggle && (
-            <button
-              type="button"
-              onClick={onToggle}
-              className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-secondary hover:bg-surface-muted"
-              aria-expanded={visible}
-            >
-              {visible ? 'Ẩn' : 'Hiện'}
-            </button>
-          )}
-        </div>
+        {(headerExtra || onToggle) && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+            {headerExtra}
+            {onToggle && (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-secondary hover:bg-surface-muted"
+                aria-expanded={visible}
+              >
+                {visible ? 'Ẩn' : 'Hiện'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {visible && <div className="p-4">{children}</div>}

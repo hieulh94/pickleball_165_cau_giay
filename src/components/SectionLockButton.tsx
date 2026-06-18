@@ -20,7 +20,7 @@ export function SectionLockButton({
       disabled={disabled}
       title={disabled ? disabledTitle : locked ? 'Đã chốt — nhập mật khẩu để mở khóa' : 'Chốt bằng mật khẩu'}
       className={cn(
-        'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors',
+        'shrink-0 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap',
         disabled && 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400',
         !disabled &&
           locked &&
