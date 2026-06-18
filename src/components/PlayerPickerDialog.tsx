@@ -6,7 +6,7 @@ import {
 } from '../lib/clubPlayers'
 import { formatParticipantName, normalizeParticipantName } from '../lib/showmatchParticipants'
 import { cn } from '../lib/cn'
-import { selectClassName } from './ui/styles'
+import { getSkillLevelToggleClass } from '../lib/skillLevelStyles'
 import type { SkillLevel } from '../types'
 
 interface PlayerPickerDialogBaseProps {
@@ -130,19 +130,23 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
           </p>
 
           {multiple && 'onSkillLevelChange' in props && (
-            <div className="mt-3 flex items-center gap-2">
-              <label htmlFor="picker-skill-level" className="shrink-0 text-sm font-medium text-neutral-700">
-                Trình độ
-              </label>
-              <select
-                id="picker-skill-level"
-                value={skillLevel}
-                onChange={(e) => props.onSkillLevelChange(Number(e.target.value) as SkillLevel)}
-                className={selectClassName}
-              >
-                <option value={1}>Trình độ 1</option>
-                <option value={2}>Trình độ 2</option>
-              </select>
+            <div className="mt-3">
+              <p className="text-sm font-medium text-neutral-700">Trình độ</p>
+              <div className="mt-1.5 flex gap-2">
+                {([1, 2] as const).map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => props.onSkillLevelChange(level)}
+                    className={cn(
+                      'flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors',
+                      getSkillLevelToggleClass(level, skillLevel === level),
+                    )}
+                  >
+                    Trình độ {level}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

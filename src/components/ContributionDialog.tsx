@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { parseContributionAmountInput } from '../lib/contributionMoney'
 import { ContributionAmount } from './leaderboard/ContributionCompactAmount'
+import { SkillLevelBadge } from './SkillLevelBadge'
 import type { Participant } from '../types'
 
 interface ContributionDialogProps {
@@ -129,7 +130,7 @@ export function ContributionDialog({
                           {participant.name}
                         </p>
                         {!editing && (
-                          <p className="text-xs text-neutral-500">Trình độ {participant.skillLevel}</p>
+                          <SkillLevelBadge level={participant.skillLevel} short={false} className="mt-0.5" />
                         )}
                       </div>
                       {editing ? (

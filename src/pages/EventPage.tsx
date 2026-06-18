@@ -10,6 +10,7 @@ import { ManualSchedulePanel } from '../components/ManualSchedulePanel'
 import { PlayoffSection } from '../components/PlayoffSection'
 import { PlayerNameInput } from '../components/PlayerNameInput'
 import { PlayerPickerDialog } from '../components/PlayerPickerDialog'
+import { SkillLevelBadge } from '../components/SkillLevelBadge'
 import { ResultDialog } from '../components/ResultDialog'
 import {
   applyGroupsToPairs,
@@ -925,9 +926,7 @@ export function EventPage() {
                       TT {manualEntryOrderById.get(p.id)}
                     </span>
                   ) : !p.isManualEntry ? (
-                    <span className="mt-1 inline-block rounded-full bg-secondary-50 px-2 py-0.5 text-[10px] font-medium text-secondary-700">
-                      TĐ{p.skillLevel}
-                    </span>
+                    <SkillLevelBadge level={p.skillLevel} className="mt-1" />
                   ) : null}
                 </div>
                 <button
