@@ -1,4 +1,3 @@
-import { applyGroupsToPairs } from './groups'
 import type { ClubPlayerGender } from './clubPlayers'
 import type { Participant, Pair } from '../types'
 
@@ -132,8 +131,8 @@ function pairCrossLevel(
 
 export function randomPairs(
   participants: Participant[],
-  splitGroups: boolean,
-  groupCount?: number,
+  _splitGroups: boolean,
+  _groupCount?: number,
   options?: RandomPairOptions,
 ): { pairs: Pair[] } | { error: string } {
   const level1 = participants.filter((p) => p.skillLevel === 1)
@@ -142,7 +141,7 @@ export function randomPairs(
   if (level1.length === 0 || level2.length === 0) {
     const shuffledPairs = pairShuffled(participants, options)
     if ('error' in shuffledPairs) return shuffledPairs
-    return { pairs: applyGroupsToPairs(shuffledPairs, splitGroups, groupCount) }
+    return { pairs: shuffledPairs }
   }
 
   if (level1.length !== level2.length) {
@@ -155,7 +154,7 @@ export function randomPairs(
   const crossPairs = pairCrossLevel(shuffled1, level2, options)
   if ('error' in crossPairs) return crossPairs
 
-  return { pairs: applyGroupsToPairs(crossPairs, splitGroups, groupCount) }
+  return { pairs: crossPairs }
 }
 
 export function getPairLabel(

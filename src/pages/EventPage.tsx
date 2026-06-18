@@ -11,13 +11,16 @@ import { PlayoffSection } from '../components/PlayoffSection'
 import { PlayerNameInput } from '../components/PlayerNameInput'
 import { PlayerPickerDialog } from '../components/PlayerPickerDialog'
 import { SkillLevelBadge } from '../components/SkillLevelBadge'
+import { PairGroupSelect } from '../components/PairGroupSelect'
 import { ResultDialog } from '../components/ResultDialog'
 import {
+  allPairsAssignedToGroups,
   applyGroupsToPairs,
-  assignRandomGroup,
   MAX_GROUP_COUNT,
   MIN_GROUP_COUNT,
+  randomAssignGroups,
   resolveGroupCount,
+  UNASSIGNED_GROUP_LABEL,
 } from '../lib/groups'
 import { filterGroupMatches, filterPlayoffMatches, isGroupMatch } from '../lib/matches'
 import { getPairLabel, randomPairs } from '../lib/pairing'
@@ -26,6 +29,15 @@ import {
   getParticipantGender,
 } from '../lib/participantGender'
 import { getRandomPairSettings } from '../lib/randomPairSettings'
+import {
+  applySetupLock,
+  applySetupUnlock,
+  getSetupLockBlockReason,
+  getSetupLockConfirmMessage,
+  isSetupLocked,
+  verifySetupLockPassword,
+  type SetupLockKey,
+} from '../lib/setupLocks'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { generateSchedule } from '../lib/schedule'
 import {
@@ -43,6 +55,7 @@ import {
 } from '../components/CollapsibleSection'
 import { SectionNavBar } from '../components/SectionNavBar'
 import { StandingsContent } from '../components/StandingsSection'
+import { SectionLockButton } from '../components/SectionLockButton'
 import { ShowMatchEventPage } from './ShowMatchEventPage'
 import { Button } from '../components/ui/Button'
 import { BackLink } from '../components/ui/BackLink'
@@ -133,6 +146,7 @@ export function EventPage() {
   const [courtInput, setCourtInput] = useState('')
   const [manualPlayer1Name, setManualPlayer1Name] = useState('')
   const [manualPlayer2Name, setManualPlayer2Name] = useState('')
+  const [manualPairGroup, setManualPairGroup] = useState<string | undefined>(undefined)
   const [isEditingEventName, setIsEditingEventName] = useState(false)
   const [eventNameInput, setEventNameInput] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
@@ -150,6 +164,8 @@ export function EventPage() {
     null,
   )
   const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
+  const [showEnableSplitGroupsConfirm, setShowEnableSplitGroupsConfirm] = useState(false)
+  const [showRandomizeGroupsConfirm, setShowRandomizeGroupsConfirm] = useState(false)
   const [groupCountInput, setGroupCountInput] = useState('2')
   const [groupCountError, setGroupCountError] = useState<string | null>(null)
   const [sectionVisibility, setSectionVisibility] = useState(DEFAULT_SECTION_VISIBILITY)
@@ -159,6 +175,12 @@ export function EventPage() {
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [setupLockConfirm, setSetupLockConfirm] = useState<{
+    key: SetupLockKey
+    action: 'lock' | 'unlock'
+  } | null>(null)
+  const [setupLockPassword, setSetupLockPassword] = useState('')
+  const [setupLockPasswordError, setSetupLockPasswordError] = useState<string | null>(null)
 
   const setSectionVisible = (key: SectionKey, visible: boolean) => {
     setSectionVisibility((prev) => ({ ...prev, [key]: visible }))
@@ -266,12 +288,23 @@ export function EventPage() {
     if (!event) return []
     const grouped = new Map<string, typeof event.pairs>()
     for (const pair of event.pairs) {
-      const key = pair.group ?? 'Tất cả'
+      const key = event.splitGroups
+        ? pair.group ?? UNASSIGNED_GROUP_LABEL
+        : pair.group ?? 'Tất cả'
       const list = grouped.get(key) ?? []
       list.push(pair)
       grouped.set(key, list)
     }
-    return [...grouped.entries()]
+    return [...grouped.entries()].sort(([a], [b]) => {
+      if (a === UNASSIGNED_GROUP_LABEL) return -1
+      if (b === UNASSIGNED_GROUP_LABEL) return 1
+      return a.localeCompare(b, 'vi')
+    })
+  }, [event])
+
+  const resolvedGroupCount = useMemo(() => {
+    if (!event?.splitGroups) return MIN_GROUP_COUNT
+    return resolveGroupCount(event.pairs.length, event.groupCount)
   }, [event])
 
   const standings = useMemo(() => {
@@ -415,6 +448,10 @@ export function EventPage() {
   }
 
   const addParticipants = (rawNames: string[]) => {
+    if (event.participantsLocked) {
+      alert('Danh sách người tham gia đã được chốt.')
+      return
+    }
     const existing = new Set(
       event.participants.map((p) => normalizeParticipantName(p.name)),
     )
@@ -444,7 +481,59 @@ export function EventPage() {
     })
   }
 
+  const requestSetupLockToggle = (key: SetupLockKey) => {
+    const locked = isSetupLocked(event, key)
+    if (!locked) {
+      const reason = getSetupLockBlockReason(
+        event,
+        key,
+        unpairedParticipants.length,
+      )
+      if (reason) {
+        alert(reason)
+        return
+      }
+    }
+    setSetupLockConfirm({ key, action: locked ? 'unlock' : 'lock' })
+  }
+
+  const doSetupLockConfirm = () => {
+    if (!setupLockConfirm) return
+    if (!verifySetupLockPassword(event, setupLockPassword)) {
+      setSetupLockPasswordError('Mật khẩu không đúng.')
+      return
+    }
+    const updated =
+      setupLockConfirm.action === 'lock'
+        ? applySetupLock(event, setupLockConfirm.key)
+        : applySetupUnlock(event, setupLockConfirm.key)
+    persist(updated)
+    setSetupLockConfirm(null)
+    setSetupLockPassword('')
+    setSetupLockPasswordError(null)
+  }
+
+  const cancelSetupLockConfirm = () => {
+    setSetupLockConfirm(null)
+    setSetupLockPassword('')
+    setSetupLockPasswordError(null)
+  }
+
+  const pairsLockBlockReason = getSetupLockBlockReason(
+    event,
+    'pairs',
+    unpairedParticipants.length,
+  )
+  const groupsLockBlockReason = event.splitGroups
+    ? getSetupLockBlockReason(event, 'groups', unpairedParticipants.length)
+    : 'Bật chia bảng đấu trước'
+
   const doRemoveParticipant = () => {
+    if (event.participantsLocked || event.pairsLocked) {
+      alert('Danh sách người tham gia đã được chốt.')
+      setParticipantToDelete(null)
+      return
+    }
     if (!participantToDelete) return
 
     const manualPair = event.pairs.find(
@@ -485,6 +574,11 @@ export function EventPage() {
   }
 
   const doRandomPairs = () => {
+    if (event.pairsLocked) {
+      alert('Cặp đôi đã được chốt.')
+      setShowRandomPairsConfirm(false)
+      return
+    }
     const lockedPairs = event.pairs.filter((pair) => isManualPair(pair))
     const lockedIds = new Set(lockedPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
     const remainingParticipants = event.participants.filter((p) => !lockedIds.has(p.id))
@@ -518,11 +612,14 @@ export function EventPage() {
       generatedPairs = result.pairs.map((pair) => ({ ...pair, locked: false }))
     }
 
-    const finalPairs = applyGroupsToPairs(
-      [...lockedPairs, ...generatedPairs],
-      event.splitGroups,
-      event.groupCount,
-    )
+    const finalPairs = event.splitGroups
+      ? applyGroupsToPairs(
+          [...lockedPairs, ...generatedPairs],
+          true,
+          event.groupCount,
+          'manual',
+        )
+      : [...lockedPairs, ...generatedPairs]
     const wheelNames =
       remainingParticipants.length > 0
         ? remainingParticipants.map((p) => p.name)
@@ -542,6 +639,10 @@ export function EventPage() {
   }
 
   const requestRandomPairs = () => {
+    if (event.pairsLocked) {
+      alert('Cặp đôi đã được chốt.')
+      return
+    }
     const lockedPairs = event.pairs.filter((pair) => isManualPair(pair))
     const lockedIds = new Set(lockedPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
     const remainingParticipants = event.participants.filter((p) => !lockedIds.has(p.id))
@@ -559,6 +660,10 @@ export function EventPage() {
   }
 
   const handleAddManualPair = () => {
+    if (event.pairsLocked) {
+      alert('Cặp đôi đã được chốt.')
+      return
+    }
     const player1Name = normalizeParticipantName(manualPlayer1Name)
     const player2Name = normalizeParticipantName(manualPlayer2Name)
 
@@ -569,6 +674,21 @@ export function EventPage() {
     if (player1Name === player2Name) {
       alert('Hai người trong một cặp phải khác nhau.')
       return
+    }
+
+    if (event.participantsLocked) {
+      const exists1 = event.participants.some(
+        (p) => normalizeParticipantName(p.name) === player1Name,
+      )
+      const exists2 = event.participants.some(
+        (p) => normalizeParticipantName(p.name) === player2Name,
+      )
+      if (!exists1 || !exists2) {
+        alert(
+          'Danh sách người tham gia đã được chốt — chỉ chọn người có sẵn trong danh sách.',
+        )
+        return
+      }
     }
 
     const allParticipants = [...event.participants]
@@ -598,9 +718,7 @@ export function EventPage() {
     }
 
     const group =
-      event.splitGroups && event.pairs.length >= 1
-        ? assignRandomGroup(event.pairs, event.groupCount)
-        : undefined
+      event.splitGroups && manualPairGroup ? manualPairGroup : undefined
 
     persist({
       ...event,
@@ -625,6 +743,11 @@ export function EventPage() {
   const handleGenerateSchedule = () => {
     if (event.pairs.length < 2) {
       alert('Cần ít nhất 2 cặp đôi. Hãy random cặp đôi trước.')
+      return
+    }
+
+    if (event.splitGroups && !allPairsAssignedToGroups(event.pairs, event.groupCount)) {
+      alert('Hãy phân bảng cho tất cả cặp đôi trước khi tạo lịch.')
       return
     }
 
@@ -668,9 +791,15 @@ export function EventPage() {
     const pair2 = event.pairs.find((p) => p.id === input.pair2Id)
     if (!pair1 || !pair2) return
 
-    if (event.splitGroups && pair1.group && pair2.group && pair1.group !== pair2.group) {
-      alert('Hai cặp phải cùng bảng khi đã chia bảng.')
-      return
+    if (event.splitGroups) {
+      if (!pair1.group || !pair2.group) {
+        alert('Hai cặp phải được phân bảng trước khi tạo trận thủ công.')
+        return
+      }
+      if (pair1.group !== pair2.group) {
+        alert('Hai cặp phải cùng bảng khi đã chia bảng.')
+        return
+      }
     }
 
     const sameRoundMatches = groupMatches.filter((m) => m.round === input.round)
@@ -730,7 +859,7 @@ export function EventPage() {
     setMatchToDelete(matchId)
   }
 
-  const handleConfirmGroupCount = () => {
+  const parseGroupCountInput = (): number | null => {
     const count = parseInt(groupCountInput, 10)
     if (
       Number.isNaN(count) ||
@@ -740,18 +869,105 @@ export function EventPage() {
       setGroupCountError(
         `Nhập số bảng từ ${MIN_GROUP_COUNT} đến ${MAX_GROUP_COUNT}.`,
       )
+      return null
+    }
+    return count
+  }
+
+  const handleConfirmGroupCountRandom = () => {
+    if (event.groupsLocked || event.pairsLocked) {
+      alert('Bảng đấu đã được chốt hoặc cặp đôi đã chốt.')
       return
     }
+    const count = parseGroupCountInput()
+    if (count === null) return
 
     persist({
       ...event,
       splitGroups: true,
       groupCount: count,
-      pairs: applyGroupsToPairs(event.pairs, true, count),
+      pairs: randomAssignGroups(event.pairs, count),
       matches: playoffMatches,
     })
     setShowGroupCountDialog(false)
     setGroupCountError(null)
+  }
+
+  const handleConfirmGroupCountManual = () => {
+    if (event.groupsLocked || event.pairsLocked) {
+      alert('Bảng đấu đã được chốt hoặc cặp đôi đã chốt.')
+      return
+    }
+    const count = parseGroupCountInput()
+    if (count === null) return
+
+    persist({
+      ...event,
+      splitGroups: true,
+      groupCount: count,
+      pairs: applyGroupsToPairs(event.pairs, true, count, 'manual'),
+      matches: playoffMatches,
+    })
+    setShowGroupCountDialog(false)
+    setGroupCountError(null)
+  }
+
+  const openGroupCountDialog = () => {
+    const suggested = resolveGroupCount(event.pairs.length, event.groupCount)
+    setGroupCountInput(String(suggested))
+    setGroupCountError(null)
+    setShowGroupCountDialog(true)
+  }
+
+  const handleConfirmEnableSplitGroups = () => {
+    if (event.groupsLocked || event.pairsLocked) {
+      alert(
+        event.groupsLocked
+          ? 'Bảng đấu đã được chốt.'
+          : 'Cặp đôi đã được chốt.',
+      )
+      setShowEnableSplitGroupsConfirm(false)
+      return
+    }
+    setShowEnableSplitGroupsConfirm(false)
+    openGroupCountDialog()
+  }
+
+  const handleRandomizeGroups = () => {
+    if (!event.splitGroups) return
+    if (event.groupsLocked) {
+      alert('Bảng đấu đã được chốt.')
+      return
+    }
+    setShowRandomizeGroupsConfirm(true)
+  }
+
+  const doRandomizeGroups = () => {
+    if (!event.splitGroups) return
+    if (event.groupsLocked) {
+      alert('Bảng đấu đã được chốt.')
+      setShowRandomizeGroupsConfirm(false)
+      return
+    }
+    persist({
+      ...event,
+      pairs: randomAssignGroups(event.pairs, event.groupCount),
+      matches: playoffMatches,
+    })
+    setShowRandomizeGroupsConfirm(false)
+  }
+
+  const handlePairGroupChange = (pairId: string, group: string | undefined) => {
+    if (event.groupsLocked) {
+      alert('Bảng đấu đã được chốt.')
+      return
+    }
+    persist({
+      ...event,
+      pairs: event.pairs.map((pair) =>
+        pair.id === pairId ? { ...pair, group } : pair,
+      ),
+    })
   }
 
   const handleCreatePlayoffMatch = (input: {
@@ -907,8 +1123,24 @@ export function EventPage() {
         title="Người tham gia"
         description="Chọn nhiều người từ danh sách CLB, gán trình độ (1 hoặc 2)"
         visible={sectionVisibility.participants}
+        headerExtra={
+          <SectionLockButton
+            locked={event.participantsLocked === true}
+            onClick={() => requestSetupLockToggle('participants')}
+          />
+        }
       >
-        <Button onClick={() => setParticipantPickerOpen(true)}>+ Chọn người chơi</Button>
+        {event.participantsLocked && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            🔒 Đã chốt danh sách người tham gia.
+          </p>
+        )}
+        <Button
+          onClick={() => setParticipantPickerOpen(true)}
+          disabled={event.participantsLocked}
+        >
+          + Chọn người chơi
+        </Button>
 
         {event.participants.length > 0 ? (
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -929,15 +1161,17 @@ export function EventPage() {
                     <SkillLevelBadge level={p.skillLevel} className="mt-1" />
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setParticipantToDelete(p.id)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-neutral-100 text-base font-medium leading-none text-neutral-600 hover:border-neutral-400 hover:bg-neutral-200 hover:text-neutral-800"
-                  title="Xóa"
-                  aria-label={`Xóa ${p.name}`}
-                >
-                  ×
-                </button>
+                {!event.participantsLocked && (
+                  <button
+                    type="button"
+                    onClick={() => setParticipantToDelete(p.id)}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-neutral-100 text-base font-medium leading-none text-neutral-600 hover:border-neutral-400 hover:bg-neutral-200 hover:text-neutral-800"
+                    title="Xóa"
+                    aria-label={`Xóa ${p.name}`}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -952,43 +1186,83 @@ export function EventPage() {
         description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
         headerExtra={
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={event.splitGroups}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  const suggested = resolveGroupCount(
-                    event.pairs.length,
-                    event.groupCount,
-                  )
-                  setGroupCountInput(String(suggested))
-                  setGroupCountError(null)
-                  setShowGroupCountDialog(true)
-                  return
-                }
-                persist({
-                  ...event,
-                  splitGroups: false,
-                  groupCount: undefined,
-                  pairs: applyGroupsToPairs(event.pairs, false),
-                  matches: playoffMatches,
-                })
-              }}
-              className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600"
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <SectionLockButton
+              locked={event.pairsLocked === true}
+              disabled={!event.pairsLocked && !!pairsLockBlockReason}
+              disabledTitle={pairsLockBlockReason ?? undefined}
+              onClick={() => requestSetupLockToggle('pairs')}
             />
-            <span className="text-sm font-medium text-neutral-700">Chia bảng đấu</span>
-          </label>
+            <label
+              className={`flex items-center gap-2 ${
+                event.groupsLocked || event.pairsLocked
+                  ? 'cursor-not-allowed opacity-60'
+                  : 'cursor-pointer'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={event.splitGroups}
+                disabled={event.groupsLocked || event.pairsLocked}
+                onChange={(e) => {
+                  if (event.groupsLocked || event.pairsLocked) {
+                    alert(
+                      event.groupsLocked
+                        ? 'Bảng đấu đã được chốt.'
+                        : 'Cặp đôi đã được chốt.',
+                    )
+                    return
+                  }
+                  if (e.target.checked) {
+                    setShowEnableSplitGroupsConfirm(true)
+                    return
+                  }
+                  persist({
+                    ...event,
+                    splitGroups: false,
+                    groupCount: undefined,
+                    pairs: applyGroupsToPairs(event.pairs, false),
+                    matches: playoffMatches,
+                  })
+                }}
+                className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-600 disabled:cursor-not-allowed"
+              />
+              <span className="text-sm font-medium text-neutral-700">Chia bảng đấu</span>
+            </label>
+            {event.splitGroups ? (
+              <SectionLockButton
+                locked={event.groupsLocked === true}
+                disabled={!event.groupsLocked && !!groupsLockBlockReason}
+                disabledTitle={groupsLockBlockReason ?? undefined}
+                onClick={() => requestSetupLockToggle('groups')}
+              />
+            ) : null}
+          </div>
         }
       >
+        {event.pairsLocked && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            🔒 Đã chốt cặp đôi.
+          </p>
+        )}
+        {event.splitGroups && event.groupsLocked && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            🔒 Đã chốt phân bảng.
+          </p>
+        )}
         <Button
           onClick={requestRandomPairs}
+          disabled={event.pairsLocked}
           className="bg-neutral-900 hover:bg-neutral-800"
         >
           🎲 Random cặp đôi
         </Button>
 
-        <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50 p-4">
+        <div
+          className={`mt-4 rounded-xl border border-primary-200 bg-primary-50 p-4 ${
+            event.pairsLocked ? 'pointer-events-none opacity-60' : ''
+          }`}
+        >
           <p className="text-sm font-semibold text-primary-800">✋ Hoặc ghép tay cặp đôi</p>
           <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
             <PlayerNameInput
@@ -1013,11 +1287,39 @@ export function EventPage() {
               + Thêm cặp
             </Button>
           </div>
+          {event.splitGroups && !event.groupsLocked && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-neutral-700">Bảng đấu</span>
+              <PairGroupSelect
+                value={manualPairGroup}
+                groupCount={resolvedGroupCount}
+                onChange={setManualPairGroup}
+                className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+              />
+            </div>
+          )}
           <p className="mt-2 text-xs text-neutral-500">
             Còn {unpairedParticipants.length} người chưa ghép cặp. Có thể nhập tên mới, hệ thống sẽ
             tự thêm người chơi vào danh sách.
           </p>
         </div>
+
+        {event.pairs.length > 0 && event.splitGroups && !event.groupsLocked && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleRandomizeGroups}
+              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              🎲 Xếp bảng ngẫu nhiên
+            </button>
+            {!allPairsAssignedToGroups(event.pairs, event.groupCount) ? (
+              <p className="text-xs text-amber-700">
+                Còn cặp chưa phân bảng — chọn bảng cho từng cặp trước khi tạo lịch.
+              </p>
+            ) : null}
+          </div>
+        )}
 
         {event.pairs.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -1042,14 +1344,39 @@ export function EventPage() {
             {pairsByGroup.map(([group, pairs]) => (
               <div key={group}>
                 {event.splitGroups && (
-                  <h4 className="mb-2 text-sm font-semibold text-secondary-700">{group}</h4>
+                  <h4
+                    className={`mb-2 text-sm font-semibold ${
+                      group === UNASSIGNED_GROUP_LABEL
+                        ? 'text-amber-700'
+                        : 'text-secondary-700'
+                    }`}
+                  >
+                    {group}
+                  </h4>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pairs.map((pair) => {
                     const pairNumber = pairNumberById.get(pair.id) ?? 0
                     return (
                       <div key={pair.id} className={pairCardClassName(pairNumber)}>
-                        <p className="font-bold">Cặp {pairNumber}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-bold">Cặp {pairNumber}</p>
+                          {event.splitGroups && !event.groupsLocked && (
+                            <PairGroupSelect
+                              value={pair.group}
+                              groupCount={resolvedGroupCount}
+                              onChange={(nextGroup) =>
+                                handlePairGroupChange(pair.id, nextGroup)
+                              }
+                              className="max-w-[8.5rem] rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[11px] focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
+                            />
+                          )}
+                          {event.splitGroups && event.groupsLocked && pair.group && (
+                            <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                              {pair.group}
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-0.5 text-sm leading-snug">
                           {getPairShortLabel(pair, event.participants)}
                           <PairTypeBadge pair={pair} />
@@ -1434,19 +1761,21 @@ export function EventPage() {
       <EventCodeDialog
         open={showGroupCountDialog}
         title="Chia bảng đấu"
-        message="Nhập số bảng để chia cặp đôi (Bảng A, Bảng B, …). Các cặp sẽ được xếp ngẫu nhiên vào bảng. Lịch vòng bảng hiện tại sẽ bị xóa."
+        message="Nhập số bảng (Bảng A, Bảng B, …). Chọn xếp ngẫu nhiên hoặc tự phân bảng cho từng cặp. Lịch vòng bảng hiện tại sẽ bị xóa."
         value={groupCountInput}
         inputType="number"
         inputMin={MIN_GROUP_COUNT}
         inputMax={MAX_GROUP_COUNT}
         placeholder={`VD: ${MIN_GROUP_COUNT}, 3, 4`}
-        confirmLabel="Áp dụng"
+        confirmLabel="Xếp ngẫu nhiên"
+        secondaryConfirmLabel="Phân bảng thủ công"
         error={groupCountError}
         onChange={(value) => {
           setGroupCountInput(value)
           if (groupCountError) setGroupCountError(null)
         }}
-        onConfirm={handleConfirmGroupCount}
+        onConfirm={handleConfirmGroupCountRandom}
+        onSecondaryConfirm={handleConfirmGroupCountManual}
         onCancel={() => {
           setShowGroupCountDialog(false)
           setGroupCountError(null)
@@ -1458,6 +1787,47 @@ export function EventPage() {
         labels={randomWheelSession?.wheelLabels ?? []}
         pairLabels={randomWheelSession?.pairLabels ?? []}
         onClose={finishRandomWheel}
+      />
+
+      {setupLockConfirm && (
+        <EventCodeDialog
+          open
+          title={getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action).title}
+          message={
+            getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action).message
+          }
+          value={setupLockPassword}
+          inputType="password"
+          placeholder="Nhập mật khẩu"
+          error={setupLockPasswordError}
+          confirmLabel={
+            getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action).confirmLabel
+          }
+          onChange={(value) => {
+            setSetupLockPassword(value)
+            if (setupLockPasswordError) setSetupLockPasswordError(null)
+          }}
+          onConfirm={doSetupLockConfirm}
+          onCancel={cancelSetupLockConfirm}
+        />
+      )}
+
+      <ConfirmDialog
+        open={showEnableSplitGroupsConfirm}
+        title="Bật chia bảng đấu"
+        message="Sau khi bật, bạn sẽ chọn số bảng và phân cặp vào từng bảng. Lịch vòng bảng hiện tại sẽ bị xóa khi áp dụng."
+        confirmLabel="Tiếp tục"
+        onConfirm={handleConfirmEnableSplitGroups}
+        onCancel={() => setShowEnableSplitGroupsConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={showRandomizeGroupsConfirm}
+        title="Xếp bảng ngẫu nhiên"
+        message="Tất cả cặp đôi sẽ được xếp lại ngẫu nhiên vào các bảng. Lịch vòng bảng hiện tại sẽ bị xóa."
+        confirmLabel="Xếp ngẫu nhiên"
+        onConfirm={doRandomizeGroups}
+        onCancel={() => setShowRandomizeGroupsConfirm(false)}
       />
 
       <ConfirmDialog

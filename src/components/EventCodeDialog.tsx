@@ -10,10 +10,12 @@ interface EventCodeDialogProps {
   placeholder?: string
   error?: string | null
   confirmLabel?: string
+  secondaryConfirmLabel?: string
   inputMin?: number
   inputMax?: number
   onChange: (value: string) => void
   onConfirm: () => void
+  onSecondaryConfirm?: () => void
   onCancel: () => void
 }
 
@@ -26,10 +28,12 @@ export function EventCodeDialog({
   placeholder = 'Nhập mã event',
   error,
   confirmLabel = 'Xác thực',
+  secondaryConfirmLabel,
   inputMin,
   inputMax,
   onChange,
   onConfirm,
+  onSecondaryConfirm,
   onCancel,
 }: EventCodeDialogProps) {
   if (!open) return null
@@ -52,10 +56,15 @@ export function EventCodeDialog({
           autoFocus
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
           <Button variant="secondary" onClick={onCancel}>
             Hủy
           </Button>
+          {secondaryConfirmLabel && onSecondaryConfirm ? (
+            <Button variant="secondary" onClick={onSecondaryConfirm}>
+              {secondaryConfirmLabel}
+            </Button>
+          ) : null}
           <Button onClick={onConfirm}>{confirmLabel}</Button>
         </div>
       </div>

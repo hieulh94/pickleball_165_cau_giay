@@ -65,6 +65,12 @@ export interface PickleballEvent {
   splitGroups: boolean
   /** Số bảng khi bật chia bảng (2–26) */
   groupCount?: number
+  /** Chốt danh sách — không thêm/xóa người tham gia */
+  participantsLocked?: boolean
+  /** Chốt ghép cặp — không random/ghép tay */
+  pairsLocked?: boolean
+  /** Chốt phân bảng — không đổi bảng đấu */
+  groupsLocked?: boolean
   courts: number[]
   matches: Match[]
   /** Số beer cống hiến từng người (participantId → amount) — mini game, dùng cho BXH */
