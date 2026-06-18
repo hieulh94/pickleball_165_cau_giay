@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ContributionHistoryDialog } from './ContributionHistoryDialog'
+import { LeaderboardUnlockGate } from './LeaderboardUnlockGate'
 import { LeaderboardFilters } from './leaderboard/LeaderboardFilters'
 import { LeaderboardPodium } from './leaderboard/LeaderboardPodium'
 import { LeaderboardRow } from './leaderboard/LeaderboardRow'
@@ -13,10 +14,12 @@ import {
   type LeaderboardStanding,
 } from '../lib/leaderboard'
 import { isFirebaseConfigured } from '../lib/firebase'
+import { isLeaderboardAccessGranted } from '../lib/leaderboardAccess'
 import { subscribeEvents } from '../lib/storage'
 import type { PickleballEvent } from '../types'
 
 export function ContributionLeaderboardPanel() {
+  const [unlocked, setUnlocked] = useState(() => isLeaderboardAccessGranted())
   const [events, setEvents] = useState<PickleballEvent[]>([])
   const [loading, setLoading] = useState(isFirebaseConfigured())
   const [selectedPlayer, setSelectedPlayer] = useState<LeaderboardStanding | null>(null)
@@ -55,6 +58,10 @@ export function ContributionLeaderboardPanel() {
   }, [events, selectedPlayer, source])
 
   if (!isFirebaseConfigured()) return null
+
+  if (!unlocked) {
+    return <LeaderboardUnlockGate onUnlock={() => setUnlocked(true)} />
+  }
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden">

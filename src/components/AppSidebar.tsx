@@ -1,6 +1,6 @@
 import { cn } from '../lib/cn'
 
-export type NavTab = 'overview' | 'matches' | 'members'
+export type NavTab = 'overview' | 'matches' | 'leaderboard' | 'members'
 
 interface AppSidebarProps {
   activeTab: NavTab
@@ -20,6 +20,15 @@ function CalendarIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]" aria-hidden>
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  )
+}
+
+function TrophyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-[18px] w-[18px]" aria-hidden>
+      <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" />
+      <path d="M5 5H3v1a3 3 0 0 0 3 3M19 5h2v1a3 3 0 0 1-3 3" />
     </svg>
   )
 }
@@ -49,6 +58,7 @@ const NAV_ITEMS: {
 }[] = [
   { id: 'overview', label: 'Tổng quan', Icon: HomeIcon },
   { id: 'matches', label: 'Event', Icon: CalendarIcon },
+  { id: 'leaderboard', label: 'BXH', Icon: TrophyIcon },
   { id: 'members', label: 'Thành viên', Icon: UsersIcon },
   { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon, disabled: true },
 ]

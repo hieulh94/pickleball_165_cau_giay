@@ -22,6 +22,15 @@ function CalendarIcon() {
   )
 }
 
+function TrophyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
+      <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" />
+      <path d="M5 5H3v1a3 3 0 0 0 3 3M19 5h2v1a3 3 0 0 1-3 3" />
+    </svg>
+  )
+}
+
 function UsersIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
@@ -33,13 +42,14 @@ function UsersIcon() {
 const TABS: { id: NavTab; label: string; Icon: typeof OverviewIcon }[] = [
   { id: 'overview', label: 'Tổng quan', Icon: OverviewIcon },
   { id: 'matches', label: 'Event', Icon: CalendarIcon },
+  { id: 'leaderboard', label: 'BXH', Icon: TrophyIcon },
   { id: 'members', label: 'Thành viên', Icon: UsersIcon },
 ]
 
 export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(15,23,42,0.04)] lg:hidden">
-      <div className="mx-auto grid max-w-7xl grid-cols-3">
+      <div className="mx-auto grid max-w-7xl grid-cols-4">
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id
           return (
