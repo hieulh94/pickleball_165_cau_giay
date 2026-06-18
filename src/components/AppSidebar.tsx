@@ -1,6 +1,6 @@
 import { cn } from '../lib/cn'
 
-export type NavTab = 'overview' | 'matches' | 'leaderboard' | 'members'
+export type NavTab = 'overview' | 'matches' | 'leaderboard' | 'members' | 'settings'
 
 interface AppSidebarProps {
   activeTab: NavTab
@@ -51,40 +51,33 @@ function SettingsIcon() {
 }
 
 const NAV_ITEMS: {
-  id: NavTab | 'settings'
+  id: NavTab
   label: string
   Icon: typeof HomeIcon
-  disabled?: boolean
 }[] = [
   { id: 'overview', label: 'Tổng quan', Icon: HomeIcon },
   { id: 'matches', label: 'Event', Icon: CalendarIcon },
   { id: 'leaderboard', label: 'BXH', Icon: TrophyIcon },
   { id: 'members', label: 'Thành viên', Icon: UsersIcon },
-  { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon, disabled: true },
+  { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon },
 ]
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   return (
     <aside className="hidden w-[180px] shrink-0 flex-col border-r border-border bg-card lg:flex">
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
-        {NAV_ITEMS.map(({ id, label, Icon, disabled }) => {
-          const active = !disabled && id === activeTab
+        {NAV_ITEMS.map(({ id, label, Icon }) => {
+          const active = id === activeTab
           return (
             <button
               key={id}
               type="button"
-              disabled={disabled}
-              onClick={() => {
-                if (disabled || id === 'settings') return
-                onTabChange(id)
-              }}
+              onClick={() => onTabChange(id)}
               className={cn(
                 'relative flex items-center gap-2.5 rounded-lg py-2 pl-2.5 pr-2 text-[13px] font-medium transition duration-200',
                 active
                   ? 'bg-primary-50 text-primary-600'
-                  : disabled
-                    ? 'cursor-not-allowed text-neutral-300'
-                    : 'text-text-secondary hover:bg-neutral-50 hover:text-text-primary',
+                  : 'text-text-secondary hover:bg-neutral-50 hover:text-text-primary',
               )}
             >
               {active && (

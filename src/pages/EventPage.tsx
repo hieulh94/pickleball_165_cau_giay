@@ -20,6 +20,11 @@ import {
 } from '../lib/groups'
 import { filterGroupMatches, filterPlayoffMatches, isGroupMatch } from '../lib/matches'
 import { getPairLabel, randomPairs } from '../lib/pairing'
+import {
+  areParticipantsIncompatible,
+  getParticipantGender,
+} from '../lib/participantGender'
+import { getRandomPairSettings } from '../lib/randomPairSettings'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { generateSchedule } from '../lib/schedule'
 import {
@@ -41,7 +46,6 @@ import { ShowMatchEventPage } from './ShowMatchEventPage'
 import { Button } from '../components/ui/Button'
 import { BackLink } from '../components/ui/BackLink'
 import { CompactEventHeader } from '../components/ui/CompactEventHeader'
-import { selectClassName } from '../components/ui/styles'
 import type { Match, Pair, Participant, PickleballEvent, SkillLevel } from '../types'
 
 function isManualPair(pair: Pair) {
@@ -409,25 +413,33 @@ export function EventPage() {
     return <ShowMatchEventPage event={event} onPersist={persist} />
   }
 
-  const addParticipant = (rawName: string) => {
-    const trimmed = rawName.trim()
-    if (!trimmed) return
+  const addParticipants = (rawNames: string[]) => {
+    const existing = new Set(
+      event.participants.map((p) => normalizeParticipantName(p.name)),
+    )
+    const toAdd: Participant[] = []
 
-    const normalized = normalizeParticipantName(trimmed)
-    if (event.participants.some((p) => normalizeParticipantName(p.name) === normalized)) {
-      alert('Người chơi này đã có trong danh sách.')
-      return
+    for (const rawName of rawNames) {
+      const trimmed = rawName.trim()
+      if (!trimmed) continue
+      const normalized = normalizeParticipantName(trimmed)
+      if (existing.has(normalized)) continue
+      existing.add(normalized)
+      toAdd.push({
+        id: crypto.randomUUID(),
+        name: trimmed,
+        skillLevel,
+      })
     }
 
-    const participant: Participant = {
-      id: crypto.randomUUID(),
-      name: trimmed,
-      skillLevel,
+    if (toAdd.length === 0) {
+      alert('Không có người mới để thêm (có thể đã có trong danh sách).')
+      return
     }
 
     persist({
       ...event,
-      participants: [...event.participants, participant],
+      participants: [...event.participants, ...toAdd],
     })
   }
 
@@ -487,10 +499,16 @@ export function EventPage() {
 
     let generatedPairs: PickleballEvent['pairs'] = []
     if (remainingParticipants.length > 0) {
+      const pairSettings = getRandomPairSettings()
       const result = randomPairs(
         remainingParticipants,
         event.splitGroups,
         event.groupCount,
+        {
+          avoidFemaleFemalePairs: pairSettings.avoidFemaleFemalePairs,
+          getGender: getParticipantGender,
+          cannotPair: areParticipantsIncompatible,
+        },
       )
       if ('error' in result) {
         alert(result.error)
@@ -886,20 +904,10 @@ export function EventPage() {
       <CollapsibleSection
         id="section-participants"
         title="Người tham gia"
-        description="Chọn từ danh sách CLB hoặc thêm tên mới, kèm trình độ (1 hoặc 2)"
+        description="Chọn nhiều người từ danh sách CLB, gán trình độ (1 hoặc 2)"
         visible={sectionVisibility.participants}
       >
-        <div className="flex flex-wrap gap-3">
-          <select
-            value={skillLevel}
-            onChange={(e) => setSkillLevel(Number(e.target.value) as SkillLevel)}
-            className={selectClassName}
-          >
-            <option value={1}>Trình độ 1</option>
-            <option value={2}>Trình độ 2</option>
-          </select>
-          <Button onClick={() => setParticipantPickerOpen(true)}>+ Chọn người chơi</Button>
-        </div>
+        <Button onClick={() => setParticipantPickerOpen(true)}>+ Chọn người chơi</Button>
 
         {event.participants.length > 0 ? (
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -1384,9 +1392,12 @@ export function EventPage() {
 
       <PlayerPickerDialog
         open={participantPickerOpen}
+        multiple
+        skillLevel={skillLevel}
+        onSkillLevelChange={setSkillLevel}
         excludedNames={event.participants.map((p) => p.name)}
         onClose={() => setParticipantPickerOpen(false)}
-        onSelect={addParticipant}
+        onSelectMany={addParticipants}
       />
 
       <ConfirmDialog

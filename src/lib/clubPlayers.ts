@@ -1,9 +1,16 @@
 import { normalizeParticipantName } from './showmatchParticipants'
 
+export type ClubPlayerGender = 'male' | 'female' | 'other'
+
 export interface ClubPlayer {
   id: string
   name: string
+  gender?: ClubPlayerGender
 }
+
+const GENDER_VALUES: ClubPlayerGender[] = ['male', 'female', 'other']
+
+export const DEFAULT_CLUB_PLAYER_GENDER: ClubPlayerGender = 'male'
 
 const STORAGE_KEY = 'pickleball-165-club-players'
 
@@ -50,10 +57,43 @@ const CLUB_PLAYER_NAMES = [
   'Bích Ngọc',
 ] as const
 
+function parseGender(value: unknown): ClubPlayerGender | undefined {
+  if (typeof value === 'string' && GENDER_VALUES.includes(value as ClubPlayerGender)) {
+    return value as ClubPlayerGender
+  }
+  return undefined
+}
+
+export function formatClubPlayerGender(gender?: ClubPlayerGender): string {
+  switch (gender) {
+    case 'male':
+      return 'Nam'
+    case 'female':
+      return 'Nữ'
+    case 'other':
+      return 'Khác'
+    default:
+      return 'Nam'
+  }
+}
+
+function resolveGender(gender?: ClubPlayerGender): ClubPlayerGender {
+  return parseGender(gender) ?? DEFAULT_CLUB_PLAYER_GENDER
+}
+
+function normalizeClubPlayer(item: ClubPlayer): ClubPlayer {
+  return {
+    id: item.id,
+    name: item.name.trim(),
+    gender: resolveGender(item.gender),
+  }
+}
+
 function buildSeedPlayers(): ClubPlayer[] {
   return CLUB_PLAYER_NAMES.map((name) => ({
     id: buildClubPlayerId(name),
     name,
+    gender: DEFAULT_CLUB_PLAYER_GENDER,
   }))
 }
 
@@ -75,7 +115,7 @@ function readStoredPlayers(): ClubPlayer[] | null {
           typeof (item as ClubPlayer).id === 'string' &&
           typeof (item as ClubPlayer).name === 'string',
       )
-      .map((item) => ({ id: item.id, name: item.name.trim() }))
+      .map((item) => normalizeClubPlayer(item as ClubPlayer))
       .filter((item) => item.name.length > 0)
   } catch {
     return null
@@ -94,7 +134,15 @@ export function buildClubPlayerId(name: string): string {
 
 /** Danh sách thành viên CLB (localStorage, seed từ CLUB_PLAYER_NAMES). */
 export function getClubPlayers(): ClubPlayer[] {
-  return readStoredPlayers() ?? buildSeedPlayers()
+  const stored = readStoredPlayers()
+  if (!stored) return buildSeedPlayers()
+
+  const normalized = stored.map(normalizeClubPlayer)
+  const needsGenderMigration = stored.some((player) => !parseGender(player.gender))
+  if (needsGenderMigration) {
+    writeStoredPlayers(normalized)
+  }
+  return normalized
 }
 
 /** @deprecated Dùng getClubPlayers() — giữ tương thích, luôn đọc dữ liệu mới nhất. */
@@ -108,7 +156,10 @@ export function filterClubPlayers(query: string, players = getClubPlayers()): Cl
   )
 }
 
-export function addClubPlayer(name: string): { player: ClubPlayer } | { error: string } {
+export function addClubPlayer(
+  name: string,
+  gender?: ClubPlayerGender,
+): { player: ClubPlayer } | { error: string } {
   const trimmed = name.trim()
   if (!trimmed) return { error: 'Tên không được để trống.' }
 
@@ -123,9 +174,46 @@ export function addClubPlayer(name: string): { player: ClubPlayer } | { error: s
     id = `${id}-${crypto.randomUUID().slice(0, 8)}`
   }
 
-  const player: ClubPlayer = { id, name: trimmed }
+  const player: ClubPlayer = {
+    id,
+    name: trimmed,
+    gender: resolveGender(gender),
+  }
   writeStoredPlayers([...players, player])
   return { player }
+}
+
+export function updateClubPlayer(
+  id: string,
+  input: { name: string; gender?: ClubPlayerGender },
+): { player: ClubPlayer } | { error: string } {
+  const trimmed = input.name.trim()
+  if (!trimmed) return { error: 'Tên không được để trống.' }
+
+  const players = getClubPlayers()
+  const index = players.findIndex((player) => player.id === id)
+  if (index === -1) return { error: 'Không tìm thấy thành viên.' }
+
+  const normalized = normalizeParticipantName(trimmed)
+  if (
+    players.some(
+      (player) => player.id !== id && normalizeParticipantName(player.name) === normalized,
+    )
+  ) {
+    return { error: 'Tên đã được dùng bởi thành viên khác.' }
+  }
+
+  const current = players[index]!
+  const updated: ClubPlayer = {
+    id: current.id,
+    name: trimmed,
+    gender: resolveGender(input.gender ?? current.gender),
+  }
+
+  const next = [...players]
+  next[index] = updated
+  writeStoredPlayers(next)
+  return { player: updated }
 }
 
 export function removeClubPlayer(id: string): void {

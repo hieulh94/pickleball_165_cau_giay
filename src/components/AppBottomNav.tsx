@@ -39,17 +39,27 @@ function UsersIcon() {
   )
 }
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  )
+}
+
 const TABS: { id: NavTab; label: string; Icon: typeof OverviewIcon }[] = [
   { id: 'overview', label: 'Tổng quan', Icon: OverviewIcon },
   { id: 'matches', label: 'Event', Icon: CalendarIcon },
   { id: 'leaderboard', label: 'BXH', Icon: TrophyIcon },
   { id: 'members', label: 'Thành viên', Icon: UsersIcon },
+  { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon },
 ]
 
 export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(15,23,42,0.04)] lg:hidden">
-      <div className="mx-auto grid max-w-7xl grid-cols-4">
+      <div className="mx-auto grid max-w-7xl grid-cols-5">
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id
           return (

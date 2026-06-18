@@ -3,7 +3,9 @@ import {
   addClubPlayer,
   getClubPlayers,
   removeClubPlayer,
+  updateClubPlayer,
   type ClubPlayer,
+  type ClubPlayerGender,
 } from '../lib/clubPlayers'
 
 export function useClubPlayers() {
@@ -15,8 +17,18 @@ export function useClubPlayers() {
     return () => window.removeEventListener('club-players-changed', sync)
   }, [])
 
-  const add = (name: string): string | null => {
-    const result = addClubPlayer(name)
+  const add = (name: string, gender?: ClubPlayerGender): string | null => {
+    const result = addClubPlayer(name, gender)
+    if ('error' in result) return result.error
+    setPlayers(getClubPlayers())
+    return null
+  }
+
+  const update = (
+    id: string,
+    input: { name: string; gender?: ClubPlayerGender },
+  ): string | null => {
+    const result = updateClubPlayer(id, input)
     if ('error' in result) return result.error
     setPlayers(getClubPlayers())
     return null
@@ -27,5 +39,5 @@ export function useClubPlayers() {
     setPlayers(getClubPlayers())
   }
 
-  return { players, add, remove }
+  return { players, add, update, remove }
 }

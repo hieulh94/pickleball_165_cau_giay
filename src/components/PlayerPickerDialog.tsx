@@ -5,29 +5,49 @@ import {
   getPlayerInitials,
 } from '../lib/clubPlayers'
 import { formatParticipantName, normalizeParticipantName } from '../lib/showmatchParticipants'
+import { cn } from '../lib/cn'
+import { selectClassName } from './ui/styles'
+import type { SkillLevel } from '../types'
 
-interface PlayerPickerDialogProps {
+interface PlayerPickerDialogBaseProps {
   open: boolean
   title?: string
   excludedNames?: string[]
   onClose: () => void
+}
+
+interface PlayerPickerDialogSingleProps extends PlayerPickerDialogBaseProps {
+  multiple?: false
   onSelect: (name: string) => void
 }
 
-export function PlayerPickerDialog({
-  open,
-  title = 'Chọn người chơi',
-  excludedNames = [],
-  onClose,
-  onSelect,
-}: PlayerPickerDialogProps) {
+interface PlayerPickerDialogMultiProps extends PlayerPickerDialogBaseProps {
+  multiple: true
+  skillLevel: SkillLevel
+  onSkillLevelChange: (level: SkillLevel) => void
+  onSelectMany: (names: string[]) => void
+}
+
+type PlayerPickerDialogProps = PlayerPickerDialogSingleProps | PlayerPickerDialogMultiProps
+
+export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
+  const {
+    open,
+    title = 'Chọn người chơi',
+    excludedNames = [],
+    onClose,
+    multiple = false,
+  } = props
+
   const [search, setSearch] = useState('')
   const [manualName, setManualName] = useState('')
+  const [selectedNames, setSelectedNames] = useState<string[]>([])
 
   useEffect(() => {
     if (!open) return
     setSearch('')
     setManualName('')
+    setSelectedNames([])
   }, [open])
 
   const excludedSet = useMemo(
@@ -35,20 +55,67 @@ export function PlayerPickerDialog({
     [excludedNames],
   )
 
+  const selectedSet = useMemo(
+    () => new Set(selectedNames.map((name) => normalizeParticipantName(name))),
+    [selectedNames],
+  )
+
   const filteredPlayers = useMemo(() => filterClubPlayers(search), [search])
 
   if (!open) return null
 
-  const handleSelect = (name: string) => {
-    onSelect(formatParticipantName(name))
-    onClose()
+  const handleSingleSelect = (name: string) => {
+    if (!multiple && 'onSelect' in props) {
+      props.onSelect(formatParticipantName(name))
+      onClose()
+    }
+  }
+
+  const toggleSelection = (name: string) => {
+    const formatted = formatParticipantName(name)
+    const key = normalizeParticipantName(formatted)
+    if (excludedSet.has(key)) return
+
+    setSelectedNames((prev) => {
+      const prevKeys = prev.map((n) => normalizeParticipantName(n))
+      if (prevKeys.includes(key)) {
+        return prev.filter((n) => normalizeParticipantName(n) !== key)
+      }
+      return [...prev, formatted]
+    })
+  }
+
+  const addManualToSelection = () => {
+    const trimmed = formatParticipantName(manualName)
+    if (!trimmed) return
+    const key = normalizeParticipantName(trimmed)
+    if (excludedSet.has(key)) return
+    if (selectedSet.has(key)) {
+      setManualName('')
+      return
+    }
+    setSelectedNames((prev) => [...prev, trimmed])
+    setManualName('')
   }
 
   const handleManualAdd = () => {
+    if (multiple) {
+      addManualToSelection()
+      return
+    }
     const trimmed = formatParticipantName(manualName)
     if (!trimmed) return
-    handleSelect(trimmed)
+    handleSingleSelect(trimmed)
   }
+
+  const handleConfirmMany = () => {
+    if (!multiple || !('onSelectMany' in props)) return
+    if (selectedNames.length === 0) return
+    props.onSelectMany(selectedNames)
+    onClose()
+  }
+
+  const skillLevel = multiple && 'skillLevel' in props ? props.skillLevel : 1
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -57,8 +124,28 @@ export function PlayerPickerDialog({
         <div className="border-b border-neutral-100 px-5 py-4">
           <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
           <p className="mt-1 text-sm text-neutral-500">
-            Chọn từ danh sách CLB hoặc thêm tên mới bên dưới.
+            {multiple
+              ? 'Chọn nhiều người từ danh sách CLB, gán trình độ rồi thêm vào event.'
+              : 'Chọn từ danh sách CLB hoặc thêm tên mới bên dưới.'}
           </p>
+
+          {multiple && 'onSkillLevelChange' in props && (
+            <div className="mt-3 flex items-center gap-2">
+              <label htmlFor="picker-skill-level" className="shrink-0 text-sm font-medium text-neutral-700">
+                Trình độ
+              </label>
+              <select
+                id="picker-skill-level"
+                value={skillLevel}
+                onChange={(e) => props.onSkillLevelChange(Number(e.target.value) as SkillLevel)}
+                className={selectClassName}
+              >
+                <option value={1}>Trình độ 1</option>
+                <option value={2}>Trình độ 2</option>
+              </select>
+            </div>
+          )}
+
           <input
             type="search"
             value={search}
@@ -69,6 +156,28 @@ export function PlayerPickerDialog({
           />
         </div>
 
+        {multiple && selectedNames.length > 0 && (
+          <div className="border-b border-neutral-100 px-5 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              Đã chọn ({selectedNames.length})
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {selectedNames.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => toggleSelection(name)}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-800 hover:bg-primary-100"
+                  title="Bỏ chọn"
+                >
+                  {name}
+                  <span aria-hidden>×</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="overflow-y-auto px-2 py-2">
           {filteredPlayers.length === 0 ? (
             <p className="px-3 py-8 text-center text-sm text-neutral-400">
@@ -78,14 +187,36 @@ export function PlayerPickerDialog({
             <ul className="divide-y divide-neutral-100">
               {filteredPlayers.map((player) => {
                 const isExcluded = excludedSet.has(normalizeParticipantName(player.name))
+                const isSelected = selectedSet.has(normalizeParticipantName(player.name))
+
                 return (
                   <li key={player.id}>
                     <button
                       type="button"
                       disabled={isExcluded}
-                      onClick={() => handleSelect(player.name)}
-                      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() =>
+                        multiple ? toggleSelection(player.name) : handleSingleSelect(player.name)
+                      }
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50',
+                        multiple && isSelected
+                          ? 'bg-primary-50 ring-1 ring-primary-200'
+                          : 'hover:bg-neutral-50',
+                      )}
                     >
+                      {multiple && (
+                        <span
+                          className={cn(
+                            'flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs font-bold',
+                            isSelected
+                              ? 'border-primary-600 bg-primary-600 text-white'
+                              : 'border-neutral-300 bg-white text-transparent',
+                          )}
+                          aria-hidden
+                        >
+                          ✓
+                        </span>
+                      )}
                       <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${getPlayerAvatarColor(player.name)}`}
                       >
@@ -94,11 +225,15 @@ export function PlayerPickerDialog({
                       <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">
                         {player.name}
                       </span>
-                      {isExcluded && (
+                      {isExcluded ? (
                         <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
+                          Đã có
+                        </span>
+                      ) : multiple && isSelected ? (
+                        <span className="shrink-0 rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
                           Đã chọn
                         </span>
-                      )}
+                      ) : null}
                     </button>
                   </li>
                 )
@@ -126,10 +261,11 @@ export function PlayerPickerDialog({
               disabled={!manualName.trim()}
               className="shrink-0 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
             >
-              Thêm
+              {multiple ? 'Chọn' : 'Thêm'}
             </button>
           </div>
-          <div className="mt-4 flex justify-end">
+
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -137,6 +273,16 @@ export function PlayerPickerDialog({
             >
               Đóng
             </button>
+            {multiple && (
+              <button
+                type="button"
+                onClick={handleConfirmMany}
+                disabled={selectedNames.length === 0}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                Thêm {selectedNames.length > 0 ? `${selectedNames.length} người` : ''}
+              </button>
+            )}
           </div>
         </div>
       </div>

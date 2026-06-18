@@ -41,7 +41,10 @@ export function Layout() {
   const showCreateButton = isHome && activeTab === 'matches' && !isEventDetail
 
   const isHomeTab =
-    activeTab === 'overview' || activeTab === 'matches' || activeTab === 'members'
+    activeTab === 'overview' ||
+    activeTab === 'matches' ||
+    activeTab === 'members' ||
+    activeTab === 'settings'
   const isLeaderboardTab = activeTab === 'leaderboard' && !isEventDetail
 
   return (

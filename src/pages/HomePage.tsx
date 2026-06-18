@@ -8,6 +8,7 @@ import { EventCodeDialog } from '../components/EventCodeDialog'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import type { LayoutOutletContext } from '../components/Layout'
 import { MembersPanel } from '../components/MembersPanel'
+import { SettingsPanel } from '../components/SettingsPanel'
 import { ShowmatchWeekSlider } from '../components/ShowmatchWeekSlider'
 import { FilterChip } from '../components/ui/FilterChip'
 import { SearchInput } from '../components/ui/SearchInput'
@@ -235,6 +236,8 @@ export function HomePage() {
       )}
 
       {activeTab === 'members' && <MembersPanel />}
+
+      {activeTab === 'settings' && <SettingsPanel />}
 
       {activeTab === 'overview' && (
         <>

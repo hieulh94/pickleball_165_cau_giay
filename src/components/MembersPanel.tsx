@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
+import { MemberEditDialog, MemberGenderBadge } from './MemberEditDialog'
 import { SearchInput } from './ui/SearchInput'
 import { SectionLabel } from './ui/SectionLabel'
 import { Button } from './ui/Button'
-import { inputClassName } from './ui/styles'
+import { inputClassName, selectClassName } from './ui/styles'
 import { useClubPlayers } from '../hooks/useClubPlayers'
-import { getPlayerAvatarColor, getPlayerInitials } from '../lib/clubPlayers'
+import { getPlayerAvatarColor, getPlayerInitials, type ClubPlayerGender } from '../lib/clubPlayers'
 import {
   grantMembersAccess,
   isMembersAccessGranted,
@@ -71,11 +72,13 @@ function MembersUnlockGate({ onUnlock }: { onUnlock: () => void }) {
 }
 
 function MembersPanelContent() {
-  const { players, add, remove } = useClubPlayers()
+  const { players, add, update, remove } = useClubPlayers()
   const [search, setSearch] = useState('')
   const [newName, setNewName] = useState('')
+  const [newGender, setNewGender] = useState<ClubPlayerGender>('male')
   const [error, setError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [editTarget, setEditTarget] = useState<(typeof players)[number] | null>(null)
 
   const filteredPlayers = useMemo(() => {
     const normalized = normalizeParticipantName(search)
@@ -86,13 +89,19 @@ function MembersPanelContent() {
   }, [players, search])
 
   const handleAdd = () => {
-    const err = add(newName)
+    const err = add(newName, newGender)
     if (err) {
       setError(err)
       return
     }
     setNewName('')
+    setNewGender('male')
     setError(null)
+  }
+
+  const handleSaveEdit = (input: { name: string; gender?: ClubPlayerGender }) => {
+    if (!editTarget) return 'Không tìm thấy thành viên.'
+    return update(editTarget.id, input)
   }
 
   const handleConfirmDelete = () => {
@@ -112,7 +121,7 @@ function MembersPanelContent() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <input
           type="text"
           value={newName}
@@ -126,6 +135,16 @@ function MembersPanelContent() {
           placeholder="Tên thành viên mới..."
           className="h-10 flex-1 rounded-lg border border-neutral-200 px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
         />
+        <select
+          value={newGender}
+          onChange={(e) => setNewGender(e.target.value as ClubPlayerGender)}
+          className={`h-10 shrink-0 ${selectClassName}`}
+          aria-label="Giới tính"
+        >
+          <option value="male">Nam</option>
+          <option value="female">Nữ</option>
+          <option value="other">Khác</option>
+        </select>
         <Button onClick={handleAdd} className="shrink-0 sm:w-auto">
           + Thêm
         </Button>
@@ -153,21 +172,38 @@ function MembersPanelContent() {
               >
                 {getPlayerInitials(player.name)}
               </span>
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
-                {player.name}
-              </p>
-              <button
-                type="button"
-                onClick={() => setDeleteTarget({ id: player.id, name: player.name })}
-                className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                aria-label={`Xóa ${player.name}`}
-              >
-                Xóa
-              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-text-primary">{player.name}</p>
+                <MemberGenderBadge gender={player.gender} />
+              </div>
+              <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setEditTarget(player)}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-50"
+                >
+                  Sửa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget({ id: player.id, name: player.name })}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                  aria-label={`Xóa ${player.name}`}
+                >
+                  Xóa
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      <MemberEditDialog
+        open={editTarget !== null}
+        player={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSave={handleSaveEdit}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
