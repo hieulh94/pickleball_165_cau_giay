@@ -261,6 +261,19 @@ function packOrderedMatchups(
   return rounds
 }
 
+function takePlaceableFromQueue(
+  queue: { ordered: RawMatchup[]; index: number },
+  usedPairIds: Set<string>,
+): RawMatchup | null {
+  for (let i = queue.index; i < queue.ordered.length; i++) {
+    const matchup = queue.ordered[i]!
+    if (usedPairIds.has(matchup.pair1Id) || usedPairIds.has(matchup.pair2Id)) continue
+    queue.ordered.splice(i, 1)
+    return matchup
+  }
+  return null
+}
+
 function scheduleMatchupBatches(
   batches: MatchupBatch[],
   matchesPerRound: number,
@@ -280,34 +293,42 @@ function scheduleMatchupBatches(
     index: 0,
   }))
 
-  const hasRemaining = () => queues.some((q) => q.index < q.ordered.length)
+  const hasRemaining = () =>
+    queues.some((q) => q.index < q.ordered.length)
   const rounds: RawMatchup[][] = []
 
   while (hasRemaining()) {
     const round: RawMatchup[] = []
     const usedPairIds = new Set<string>()
 
-    for (const queue of queues) {
-      while (
-        queue.index < queue.ordered.length &&
-        round.length < matchesPerRound
-      ) {
-        const matchup = queue.ordered[queue.index]
-        queue.index++
+    let madeProgress = true
+    while (round.length < matchesPerRound && madeProgress) {
+      madeProgress = false
+      for (const queue of queues) {
+        if (round.length >= matchesPerRound) break
+        if (queue.index >= queue.ordered.length) continue
 
-        if (
-          !usedPairIds.has(matchup.pair1Id) &&
-          !usedPairIds.has(matchup.pair2Id)
-        ) {
-          round.push(matchup)
-          usedPairIds.add(matchup.pair1Id)
-          usedPairIds.add(matchup.pair2Id)
-          break
-        }
+        const matchup = takePlaceableFromQueue(queue, usedPairIds)
+        if (!matchup) continue
+
+        round.push(matchup)
+        usedPairIds.add(matchup.pair1Id)
+        usedPairIds.add(matchup.pair2Id)
+        madeProgress = true
       }
     }
 
-    if (round.length === 0) break
+    if (round.length === 0) {
+      for (const queue of queues) {
+        if (queue.index < queue.ordered.length) {
+          round.push(queue.ordered[queue.index]!)
+          queue.ordered.splice(queue.index, 1)
+          break
+        }
+      }
+      if (round.length === 0) break
+    }
+
     rounds.push(round)
   }
 
