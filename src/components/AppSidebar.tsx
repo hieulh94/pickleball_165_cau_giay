@@ -1,6 +1,6 @@
 import { cn } from '../lib/cn'
 
-export type NavTab = 'overview' | 'matches' | 'leaderboard'
+export type NavTab = 'overview' | 'matches' | 'leaderboard' | 'members'
 
 interface AppSidebarProps {
   activeTab: NavTab
@@ -51,15 +51,15 @@ function SettingsIcon() {
 }
 
 const NAV_ITEMS: {
-  id: NavTab | 'members' | 'settings'
+  id: NavTab | 'settings'
   label: string
   Icon: typeof HomeIcon
   disabled?: boolean
 }[] = [
   { id: 'overview', label: 'Tổng quan', Icon: HomeIcon },
-  { id: 'matches', label: 'Trận đấu', Icon: CalendarIcon },
+  { id: 'matches', label: 'Event', Icon: CalendarIcon },
   { id: 'leaderboard', label: 'BXH', Icon: TrophyIcon },
-  { id: 'members', label: 'Thành viên', Icon: UsersIcon, disabled: true },
+  { id: 'members', label: 'Thành viên', Icon: UsersIcon },
   { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon, disabled: true },
 ]
 
@@ -75,10 +75,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               type="button"
               disabled={disabled}
               onClick={() => {
-                if (disabled) return
-                if (id === 'overview' || id === 'matches' || id === 'leaderboard') {
-                  onTabChange(id)
-                }
+                if (disabled || id === 'settings') return
+                onTabChange(id)
               }}
               className={cn(
                 'relative flex items-center gap-2.5 rounded-lg py-2 pl-2.5 pr-2 text-[13px] font-medium transition duration-200',

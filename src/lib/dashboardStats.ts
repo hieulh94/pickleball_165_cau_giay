@@ -1,4 +1,4 @@
-import { CLUB_PLAYERS } from './clubPlayers'
+import { getClubPlayers } from './clubPlayers'
 import { getWeekNumber, isScheduledInWeek } from './showmatch'
 import { normalizeParticipantName } from './showmatchParticipants'
 import type { PickleballEvent } from '../types'
@@ -29,7 +29,7 @@ export function computeDashboardStats(events: PickleballEvent[], now = new Date(
   const memberNames = new Set<string>()
   const membersThisMonth = new Set<string>()
 
-  for (const player of CLUB_PLAYERS) {
+  for (const player of getClubPlayers()) {
     memberNames.add(normalizeParticipantName(player.name))
   }
 

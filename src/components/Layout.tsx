@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AppBottomNav } from './AppBottomNav'
 import { AppSidebar, type NavTab } from './AppSidebar'
 import { ContributionLeaderboardPanel } from './ContributionLeaderboardPanel'
@@ -16,11 +16,19 @@ export type LayoutOutletContext = {
 
 export function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const isHome = location.pathname === '/'
   const isEventDetail = location.pathname.startsWith('/event/')
   const [createRequest, setCreateRequest] = useState(0)
   const [activeTab, setActiveTab] = useState<NavTab>('overview')
   const [eventList, setEventList] = useState<PickleballEvent[]>([])
+
+  const handleTabChange = (tab: NavTab) => {
+    setActiveTab(tab)
+    if (location.pathname !== '/') {
+      navigate('/')
+    }
+  }
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
@@ -32,12 +40,13 @@ export function Layout() {
     isHome && activeTab === 'overview' && !isEventDetail && isFirebaseConfigured()
   const showCreateButton = isHome && activeTab === 'matches' && !isEventDetail
 
-  const isHomeTab = activeTab === 'overview' || activeTab === 'matches'
+  const isHomeTab =
+    activeTab === 'overview' || activeTab === 'matches' || activeTab === 'members'
   const isLeaderboardTab = activeTab === 'leaderboard' && !isEventDetail
 
   return (
     <div className="flex h-dvh overflow-hidden bg-surface pb-16 lg:pb-0">
-      <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="z-50 shrink-0 border-b border-border bg-card">
@@ -47,7 +56,7 @@ export function Layout() {
                 <Link
                   to="/"
                   className="flex min-w-0 items-center gap-2.5 justify-self-start sm:gap-3"
-                  onClick={() => setActiveTab('overview')}
+                  onClick={() => handleTabChange('overview')}
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-xs font-bold text-white shadow-sm">
                     P
@@ -76,7 +85,7 @@ export function Layout() {
                 <Link
                   to="/"
                   className="flex min-w-0 items-center gap-2.5 sm:gap-3"
-                  onClick={() => setActiveTab('overview')}
+                  onClick={() => handleTabChange('overview')}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white shadow-sm">
                     P
@@ -125,7 +134,7 @@ export function Layout() {
         )}
       </div>
 
-      <AppBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <AppBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   )
 }

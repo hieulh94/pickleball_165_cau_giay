@@ -7,6 +7,7 @@ import { EventCard } from '../components/EventCard'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import type { LayoutOutletContext } from '../components/Layout'
+import { MembersPanel } from '../components/MembersPanel'
 import { ShowmatchWeekSlider } from '../components/ShowmatchWeekSlider'
 import { FilterChip } from '../components/ui/FilterChip'
 import { SearchInput } from '../components/ui/SearchInput'
@@ -232,6 +233,8 @@ export function HomePage() {
           Lỗi Firebase: {error}
         </p>
       )}
+
+      {activeTab === 'members' && <MembersPanel />}
 
       {activeTab === 'overview' && (
         <>
