@@ -6,13 +6,32 @@ import { SectionLabel } from './ui/SectionLabel'
 import { Button } from './ui/Button'
 import { inputClassName, selectClassName } from './ui/styles'
 import { useClubPlayers } from '../hooks/useClubPlayers'
-import { getPlayerAvatarColor, getPlayerInitials, type ClubPlayerGender } from '../lib/clubPlayers'
+import {
+  DEFAULT_CLUB_PLAYER_GENDER,
+  getPlayerAvatarColor,
+  getPlayerInitials,
+  type ClubPlayerGender,
+} from '../lib/clubPlayers'
+import { cn } from '../lib/cn'
 import {
   grantMembersAccess,
   isMembersAccessGranted,
   verifyMembersPassword,
 } from '../lib/membersAccess'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
+
+type GenderFilter = 'all' | ClubPlayerGender
+
+const GENDER_FILTER_OPTIONS: { value: GenderFilter; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'male', label: 'Nam' },
+  { value: 'female', label: 'Nữ' },
+  { value: 'other', label: 'Khác' },
+]
+
+function resolvePlayerGender(gender?: ClubPlayerGender): ClubPlayerGender {
+  return gender ?? DEFAULT_CLUB_PLAYER_GENDER
+}
 
 function LockIcon() {
   return (
@@ -74,6 +93,7 @@ function MembersUnlockGate({ onUnlock }: { onUnlock: () => void }) {
 function MembersPanelContent() {
   const { players, add, update, remove } = useClubPlayers()
   const [search, setSearch] = useState('')
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>('all')
   const [newName, setNewName] = useState('')
   const [newGender, setNewGender] = useState<ClubPlayerGender>('male')
   const [error, setError] = useState<string | null>(null)
@@ -82,11 +102,16 @@ function MembersPanelContent() {
 
   const filteredPlayers = useMemo(() => {
     const normalized = normalizeParticipantName(search)
-    if (!normalized) return players
-    return players.filter((player) =>
-      normalizeParticipantName(player.name).includes(normalized),
-    )
-  }, [players, search])
+    return players.filter((player) => {
+      if (genderFilter !== 'all' && resolvePlayerGender(player.gender) !== genderFilter) {
+        return false
+      }
+      if (!normalized) return true
+      return normalizeParticipantName(player.name).includes(normalized)
+    })
+  }, [players, search, genderFilter])
+
+  const hasActiveFilter = search.trim().length > 0 || genderFilter !== 'all'
 
   const handleAdd = () => {
     const err = add(newName, newGender)
@@ -153,10 +178,34 @@ function MembersPanelContent() {
 
       <SearchInput value={search} onChange={setSearch} placeholder="Tìm thành viên..." />
 
+      <div className="flex flex-wrap gap-2">
+        {GENDER_FILTER_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setGenderFilter(option.value)}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+              genderFilter === option.value
+                ? option.value === 'male'
+                  ? 'border-sky-400 bg-sky-100 text-sky-800'
+                  : option.value === 'female'
+                    ? 'border-rose-400 bg-rose-100 text-rose-800'
+                    : option.value === 'other'
+                      ? 'border-neutral-400 bg-neutral-100 text-neutral-700'
+                      : 'border-primary-500 bg-primary-100 text-primary-800'
+                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50',
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       {filteredPlayers.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-10 text-center">
           <p className="text-sm text-text-secondary">
-            {search.trim() ? 'Không tìm thấy thành viên.' : 'Chưa có thành viên nào.'}
+            {hasActiveFilter ? 'Không tìm thấy thành viên.' : 'Chưa có thành viên nào.'}
           </p>
         </div>
       ) : (

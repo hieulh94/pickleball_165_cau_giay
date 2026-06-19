@@ -5,7 +5,6 @@ import { ContributionDialog } from '../components/ContributionDialog'
 import { EventCodeDialog } from '../components/EventCodeDialog'
 import { RandomPairWheelOverlay } from '../components/RandomPairWheelOverlay'
 import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
-import { AutoSchedulePanel } from '../components/AutoSchedulePanel'
 import { ManualSchedulePanel } from '../components/ManualSchedulePanel'
 import { PlayoffSection } from '../components/PlayoffSection'
 import { PlayerNameInput } from '../components/PlayerNameInput'
@@ -161,9 +160,7 @@ export function EventPage() {
   const pendingRandomApplyRef = useRef<(() => void) | null>(null)
   const [showCreateScheduleConfirm, setShowCreateScheduleConfirm] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
-  const [scheduleCreateMode, setScheduleCreateMode] = useState<'auto' | 'manual' | null>(
-    null,
-  )
+  const [scheduleCreateMode, setScheduleCreateMode] = useState<'manual' | null>(null)
   const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
   const [showEnableSplitGroupsConfirm, setShowEnableSplitGroupsConfirm] = useState(false)
   const [showRandomizeGroupsConfirm, setShowRandomizeGroupsConfirm] = useState(false)
@@ -785,7 +782,7 @@ export function EventPage() {
     setScheduleCreateMode(null)
   }
 
-  const toggleScheduleCreateMode = (mode: 'auto' | 'manual') => {
+  const toggleScheduleCreateMode = (mode: 'manual') => {
     if (event.scheduleLocked) {
       alert('Lịch thi đấu đã được chốt.')
       return
@@ -1530,13 +1527,9 @@ export function EventPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => toggleScheduleCreateMode('auto')}
+              onClick={handleGenerateSchedule}
               disabled={event.courts.length === 0}
-              className={`rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 disabled:shadow-none ${
-                scheduleCreateMode === 'auto'
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'border border-blue-300 bg-white text-blue-800 hover:bg-blue-50'
-              }`}
+              className="rounded-lg border border-blue-300 bg-white px-4 py-2.5 text-sm font-medium text-blue-800 shadow-sm hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400 disabled:shadow-none"
             >
               📅 Tạo lịch tự động
             </button>
@@ -1553,18 +1546,6 @@ export function EventPage() {
               ✋ Tạo lịch thủ công
             </button>
           </div>
-        )}
-
-        {scheduleCreateMode === 'auto' &&
-          !event.scheduleLocked &&
-          event.courts.length > 0 &&
-          event.pairs.length >= 2 && (
-          <AutoSchedulePanel
-            pairCount={event.pairs.length}
-            courts={event.courts}
-            hasExistingSchedule={groupMatches.length > 0}
-            onGenerate={handleGenerateSchedule}
-          />
         )}
 
         {scheduleCreateMode === 'manual' &&
