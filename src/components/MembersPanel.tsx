@@ -99,7 +99,7 @@ function MembersPanelContent() {
     setError(null)
   }
 
-  const handleSaveEdit = (input: { name: string; gender?: ClubPlayerGender }) => {
+  const handleSaveEdit = async (input: { name: string; gender?: ClubPlayerGender }) => {
     if (!editTarget) return 'Không tìm thấy thành viên.'
     return update(editTarget.id, input)
   }
@@ -116,7 +116,7 @@ function MembersPanelContent() {
         <div>
           <SectionLabel>Thành viên CLB</SectionLabel>
           <p className="mt-1 text-sm text-text-secondary">
-            {players.length} thành viên · dữ liệu lưu tạm trên thiết bị
+            {players.length} thành viên · đổi tên sẽ cập nhật sang event và BXH
           </p>
         </div>
       </div>

@@ -13,13 +13,14 @@ interface MemberEditDialogProps {
   open: boolean
   player: ClubPlayer | null
   onClose: () => void
-  onSave: (input: { name: string; gender?: ClubPlayerGender }) => string | null
+  onSave: (input: { name: string; gender?: ClubPlayerGender }) => Promise<string | null> | string | null
 }
 
 export function MemberEditDialog({ open, player, onClose, onSave }: MemberEditDialogProps) {
   const [name, setName] = useState('')
   const [gender, setGender] = useState<ClubPlayerGender>('male')
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open || !player) return
@@ -30,11 +31,13 @@ export function MemberEditDialog({ open, player, onClose, onSave }: MemberEditDi
 
   if (!open || !player) return null
 
-  const handleSave = () => {
-    const err = onSave({
+  const handleSave = async () => {
+    setSaving(true)
+    const err = await onSave({
       name,
       gender,
     })
+    setSaving(false)
     if (err) {
       setError(err)
       return
@@ -109,7 +112,9 @@ export function MemberEditDialog({ open, player, onClose, onSave }: MemberEditDi
           >
             Hủy
           </button>
-          <Button onClick={handleSave}>Lưu</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Đang lưu...' : 'Lưu'}
+          </Button>
         </div>
       </div>
     </div>

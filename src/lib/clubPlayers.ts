@@ -148,6 +148,18 @@ export function getClubPlayers(): ClubPlayer[] {
 /** @deprecated Dùng getClubPlayers() — giữ tương thích, luôn đọc dữ liệu mới nhất. */
 export const CLUB_PLAYERS: ClubPlayer[] = buildSeedPlayers()
 
+export function findClubPlayerById(id: string, players = getClubPlayers()): ClubPlayer | undefined {
+  return players.find((player) => player.id === id)
+}
+
+export function findClubPlayerByName(
+  name: string,
+  players = getClubPlayers(),
+): ClubPlayer | undefined {
+  const key = normalizeParticipantName(name)
+  return players.find((player) => normalizeParticipantName(player.name) === key)
+}
+
 export function filterClubPlayers(query: string, players = getClubPlayers()): ClubPlayer[] {
   const normalized = normalizeParticipantName(query)
   if (!normalized) return players

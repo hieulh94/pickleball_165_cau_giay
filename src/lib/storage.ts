@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   setDoc,
   type Unsubscribe,
@@ -153,6 +154,15 @@ function removeUndefined<T>(value: T): T {
   }
 
   return value
+}
+
+export async function fetchAllEvents(): Promise<PickleballEvent[]> {
+  const db = getDb()
+  const snapshot = await getDocs(collection(db, EVENTS_COLLECTION))
+  const events = snapshot.docs.map((item) =>
+    docToEvent(item.id, item.data() as Record<string, unknown>),
+  )
+  return sortEvents(events)
 }
 
 export async function upsertEvent(event: PickleballEvent): Promise<void> {

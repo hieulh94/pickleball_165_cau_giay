@@ -5,6 +5,8 @@ export interface Participant {
   name: string
   skillLevel: SkillLevel
   isManualEntry?: boolean
+  /** Liên kết danh sách CLB — dùng đồng bộ đổi tên */
+  clubPlayerId?: string
 }
 
 export interface Pair {

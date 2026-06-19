@@ -29,6 +29,7 @@ import {
   getParticipantGender,
 } from '../lib/participantGender'
 import { getRandomPairSettings } from '../lib/randomPairSettings'
+import { attachClubPlayerId, participantFromClubSelection } from '../lib/clubPlayerSync'
 import {
   applySetupLock,
   applySetupUnlock,
@@ -463,11 +464,7 @@ export function EventPage() {
       const normalized = normalizeParticipantName(trimmed)
       if (existing.has(normalized)) continue
       existing.add(normalized)
-      toAdd.push({
-        id: crypto.randomUUID(),
-        name: trimmed,
-        skillLevel,
-      })
+      toAdd.push(participantFromClubSelection(trimmed, skillLevel))
     }
 
     if (toAdd.length === 0) {
@@ -701,14 +698,14 @@ export function EventPage() {
       const existed = allParticipants.find(
         (participant) => normalizeParticipantName(participant.name) === normalizedName,
       )
-      if (existed) return existed
+      if (existed) return attachClubPlayerId(existed)
 
-      const created: Participant = {
+      const created = attachClubPlayerId({
         id: crypto.randomUUID(),
         name: rawName.trim().replace(/\s+/g, ' '),
         skillLevel: 1,
         isManualEntry: true,
-      }
+      })
       allParticipants.push(created)
       return created
     }

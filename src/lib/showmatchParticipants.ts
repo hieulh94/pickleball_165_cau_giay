@@ -1,4 +1,5 @@
 import type { Pair, Participant } from '../types'
+import { attachClubPlayerId } from './clubPlayerSync'
 
 export function normalizeParticipantName(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -16,14 +17,23 @@ export function findOrCreateParticipant(
   const existed = participants.find(
     (participant) => normalizeParticipantName(participant.name) === normalized,
   )
-  if (existed) return { participants, participant: existed }
+  if (existed) {
+    const withId = attachClubPlayerId(existed)
+    if (withId.clubPlayerId && withId.clubPlayerId !== existed.clubPlayerId) {
+      return {
+        participants: participants.map((p) => (p.id === existed.id ? withId : p)),
+        participant: withId,
+      }
+    }
+    return { participants, participant: withId }
+  }
 
-  const created: Participant = {
+  const created: Participant = attachClubPlayerId({
     id: crypto.randomUUID(),
     name: formatParticipantName(rawName),
     skillLevel: 1,
     isManualEntry: true,
-  }
+  })
   return { participants: [...participants, created], participant: created }
 }
 
