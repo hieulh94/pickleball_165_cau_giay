@@ -161,6 +161,7 @@ export function EventPage() {
   const [showCreateScheduleConfirm, setShowCreateScheduleConfirm] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [scheduleCreateMode, setScheduleCreateMode] = useState<'manual' | null>(null)
+  const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(() => new Set())
   const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
   const [showEnableSplitGroupsConfirm, setShowEnableSplitGroupsConfirm] = useState(false)
   const [showRandomizeGroupsConfirm, setShowRandomizeGroupsConfirm] = useState(false)
@@ -739,6 +740,15 @@ export function EventPage() {
     setManualPlayer2Name('')
   }
 
+  const toggleRoundCollapsed = (round: number) => {
+    setCollapsedRounds((prev) => {
+      const next = new Set(prev)
+      if (next.has(round)) next.delete(round)
+      else next.add(round)
+      return next
+    })
+  }
+
   const handleGenerateSchedule = () => {
     if (event.scheduleLocked) {
       alert('Lịch thi đấu đã được chốt.')
@@ -780,6 +790,7 @@ export function EventPage() {
     setShowRegenerateConfirm(false)
     setShowCreateScheduleConfirm(false)
     setScheduleCreateMode(null)
+    setCollapsedRounds(new Set())
   }
 
   const toggleScheduleCreateMode = (mode: 'manual') => {
@@ -1589,18 +1600,37 @@ export function EventPage() {
                 const restingPairs = event.pairs.filter(
                   (pair) => !playingPairIds.has(pair.id),
                 )
+                const isCollapsed = collapsedRounds.has(round)
+                const completedCount = matches.filter((m) => m.completed).length
 
                 return (
                 <div key={round}>
-                  <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h4 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                  <button
+                    type="button"
+                    onClick={() => toggleRoundCollapsed(round)}
+                    className="mb-4 flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-left transition hover:bg-neutral-100"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span
+                      className={`text-xs text-neutral-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                      aria-hidden
+                    >
+                      ▶
+                    </span>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-neutral-600">
                       Vòng {round}
                     </h4>
                     <span className="text-xs text-neutral-400">
                       {matches.length} trận
+                      {completedCount > 0 ? ` · ${completedCount} xong` : ''}
                       {event.courts.length === 1 ? ' · 1 sân' : ''}
                     </span>
-                  </div>
+                    <span className="ml-auto text-xs font-medium text-neutral-500">
+                      {isCollapsed ? 'Hiện' : 'Ẩn'}
+                    </span>
+                  </button>
+                  {!isCollapsed && (
+                    <>
                   {restingPairs.length > 0 && (
                     <p className="mb-3 text-xs text-neutral-500">
                       Nghỉ:{' '}
@@ -1696,6 +1726,8 @@ export function EventPage() {
                         )
                       })}
                   </div>
+                    </>
+                  )}
                 </div>
                 )
               })}
