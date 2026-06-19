@@ -11,6 +11,7 @@ import { PlayerNameInput } from '../components/PlayerNameInput'
 import { PlayerPickerDialog } from '../components/PlayerPickerDialog'
 import { SkillLevelBadge } from '../components/SkillLevelBadge'
 import { PairGroupSelect } from '../components/PairGroupSelect'
+import { PairScheduleDialog } from '../components/PairScheduleDialog'
 import { ResultDialog } from '../components/ResultDialog'
 import {
   allPairsAssignedToGroups,
@@ -39,6 +40,7 @@ import {
   type SetupLockKey,
 } from '../lib/setupLocks'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
+import { getPairScheduleEntries } from '../lib/pairSchedule'
 import { generateSchedule } from '../lib/schedule'
 import {
   eventRequiresPassword,
@@ -162,6 +164,10 @@ export function EventPage() {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [scheduleCreateMode, setScheduleCreateMode] = useState<'manual' | null>(null)
   const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(() => new Set())
+  const [pairScheduleTarget, setPairScheduleTarget] = useState<{
+    pairId: string
+    pairNumber: number
+  } | null>(null)
   const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
   const [showEnableSplitGroupsConfirm, setShowEnableSplitGroupsConfirm] = useState(false)
   const [showRandomizeGroupsConfirm, setShowRandomizeGroupsConfirm] = useState(false)
@@ -338,6 +344,23 @@ export function EventPage() {
     })
     return numbers
   }, [event])
+
+  const pairScheduleEntries = useMemo(() => {
+    if (!event || !pairScheduleTarget) return []
+    return getPairScheduleEntries(
+      pairScheduleTarget.pairId,
+      event.matches,
+      event.pairs,
+      event.participants,
+      pairNumberById,
+    )
+  }, [event, pairScheduleTarget, pairNumberById])
+
+  const pairScheduleLabel = useMemo(() => {
+    if (!event || !pairScheduleTarget) return ''
+    const pair = event.pairs.find((p) => p.id === pairScheduleTarget.pairId)
+    return pair ? getPairShortLabel(pair, event.participants) : ''
+  }, [event, pairScheduleTarget])
 
   const normalizeParticipantName = (value: string) =>
     value.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -1581,13 +1604,16 @@ export function EventPage() {
                 const pairNumber = pairNumberById.get(pair.id) ?? 0
                 const color = getPairColor(pairNumber)
                 return (
-                  <span
+                  <button
                     key={pair.id}
-                    className={`inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-xs font-bold ${color.border} ${color.bg} ${color.text}`}
+                    type="button"
+                    onClick={() => setPairScheduleTarget({ pairId: pair.id, pairNumber })}
+                    className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-xs font-bold transition hover:opacity-90 ${color.border} ${color.bg} ${color.text}`}
+                    title={`Xem lịch Cặp ${pairNumber}`}
                   >
                     <span className={`h-2.5 w-2.5 rounded-full border ${color.swatch}`} />
                     Cặp {pairNumber}
-                  </span>
+                  </button>
                 )
               })}
             </div>
@@ -1788,6 +1814,14 @@ export function EventPage() {
         participantContributions={event.participantContributions}
         onClose={() => setContributionDialogOpen(false)}
         onSave={handleSaveContribution}
+      />
+
+      <PairScheduleDialog
+        open={pairScheduleTarget !== null}
+        pairNumber={pairScheduleTarget?.pairNumber ?? 0}
+        pairLabel={pairScheduleLabel}
+        entries={pairScheduleEntries}
+        onClose={() => setPairScheduleTarget(null)}
       />
 
       <ResultDialog
