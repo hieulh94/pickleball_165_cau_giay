@@ -5,13 +5,31 @@ import type { PickleballEvent } from '../types'
 
 export type SetupLockKey = 'participants' | 'pairs' | 'groups' | 'schedule'
 
-/** Mật khẩu event nếu có; không thì mật khẩu tab Cài đặt (nội bộ CLB). */
+const SETUP_LOCK_PASSWORD_SUFFIX = '1'
+
+/** Mật khẩu chốt/mở khóa setup: mật khẩu event + "1" (VD: 165 → 1651). */
+export function getSetupLockPassword(event: PickleballEvent): string | null {
+  if (event.accessPassword && event.accessPassword.length > 0) {
+    return `${event.accessPassword}${SETUP_LOCK_PASSWORD_SUFFIX}`
+  }
+  return null
+}
+
+export function getSetupLockPasswordHint(event: PickleballEvent): string | null {
+  if (event.accessPassword && event.accessPassword.length > 0) {
+    return `Mật khẩu chốt = mật khẩu event + ${SETUP_LOCK_PASSWORD_SUFFIX} (ví dụ ${event.accessPassword} → ${event.accessPassword}${SETUP_LOCK_PASSWORD_SUFFIX}).`
+  }
+  return 'Dùng mật khẩu tab Cài đặt CLB.'
+}
+
+/** Mật khẩu event + "1" nếu event có mật khẩu; không thì mật khẩu tab Cài đặt. */
 export function verifySetupLockPassword(
   event: PickleballEvent,
   password: string,
 ): boolean {
-  if (event.accessPassword && event.accessPassword.length > 0) {
-    return password === event.accessPassword
+  const setupLockPassword = getSetupLockPassword(event)
+  if (setupLockPassword) {
+    return password === setupLockPassword
   }
   return verifySettingsPassword(password)
 }
@@ -79,36 +97,44 @@ export function getSetupLockBlockReason(
 export function getSetupLockConfirmMessage(
   key: SetupLockKey,
   action: 'lock' | 'unlock',
+  event?: PickleballEvent,
 ): { title: string; message: string; confirmLabel: string } {
+  const hint = event ? getSetupLockPasswordHint(event) : null
+  const withHint = (message: string) => (hint ? `${message} ${hint}` : message)
+
   if (action === 'lock') {
     if (key === 'participants') {
       return {
         title: 'Chốt người tham gia',
-        message:
-          'Sau khi chốt, không thể thêm hoặc xóa người tham gia. Nhập mật khẩu để xác nhận.',
+        message: withHint(
+          'Sau khi chốt, không thể thêm hoặc xóa người tham gia. Nhập mật khẩu chốt để xác nhận.',
+        ),
         confirmLabel: 'Chốt',
       }
     }
     if (key === 'pairs') {
       return {
         title: 'Chốt cặp đôi',
-        message:
-          'Sau khi chốt, không thể random, ghép tay hay thay đổi cặp. Nhập mật khẩu để xác nhận.',
+        message: withHint(
+          'Sau khi chốt, không thể random, ghép tay hay thay đổi cặp. Nhập mật khẩu chốt để xác nhận.',
+        ),
         confirmLabel: 'Chốt',
       }
     }
     if (key === 'groups') {
       return {
         title: 'Chốt bảng đấu',
-        message:
-          'Sau khi chốt, không thể bật/tắt chia bảng hay đổi bảng của từng cặp. Nhập mật khẩu để xác nhận.',
+        message: withHint(
+          'Sau khi chốt, không thể bật/tắt chia bảng hay đổi bảng của từng cặp. Nhập mật khẩu chốt để xác nhận.',
+        ),
         confirmLabel: 'Chốt',
       }
     }
     return {
       title: 'Chốt lịch thi đấu',
-      message:
-        'Sau khi chốt, không thể thêm/xóa sân, tạo lại hay xóa trận vòng bảng. Nhập kết quả vẫn được. Nhập mật khẩu để xác nhận.',
+      message: withHint(
+        'Sau khi chốt, không thể thêm/xóa sân, tạo lại hay xóa trận vòng bảng. Nhập kết quả vẫn được. Nhập mật khẩu chốt để xác nhận.',
+      ),
       confirmLabel: 'Chốt',
     }
   }
@@ -116,31 +142,35 @@ export function getSetupLockConfirmMessage(
   if (key === 'participants') {
     return {
       title: 'Mở khóa người tham gia',
-      message:
-        'Mở khóa sẽ cho phép chỉnh sửa người tham gia, cặp đôi, bảng đấu và lịch thi đấu. Nhập mật khẩu để xác nhận.',
+      message: withHint(
+        'Mở khóa sẽ cho phép chỉnh sửa người tham gia, cặp đôi, bảng đấu và lịch thi đấu. Nhập mật khẩu chốt để xác nhận.',
+      ),
       confirmLabel: 'Mở khóa',
     }
   }
   if (key === 'pairs') {
     return {
       title: 'Mở khóa cặp đôi',
-      message:
-        'Mở khóa sẽ cho phép chỉnh sửa cặp đôi, bảng đấu và lịch thi đấu. Nhập mật khẩu để xác nhận.',
+      message: withHint(
+        'Mở khóa sẽ cho phép chỉnh sửa cặp đôi, bảng đấu và lịch thi đấu. Nhập mật khẩu chốt để xác nhận.',
+      ),
       confirmLabel: 'Mở khóa',
     }
   }
   if (key === 'groups') {
     return {
       title: 'Mở khóa bảng đấu',
-      message:
-        'Mở khóa sẽ cho phép thay đổi phân bảng và lịch thi đấu. Nhập mật khẩu để xác nhận.',
+      message: withHint(
+        'Mở khóa sẽ cho phép thay đổi phân bảng và lịch thi đấu. Nhập mật khẩu chốt để xác nhận.',
+      ),
       confirmLabel: 'Mở khóa',
     }
   }
   return {
     title: 'Mở khóa lịch thi đấu',
-    message:
-      'Mở khóa sẽ cho phép thêm/xóa sân, tạo lại và xóa trận vòng bảng. Nhập mật khẩu để xác nhận.',
+    message: withHint(
+      'Mở khóa sẽ cho phép thêm/xóa sân, tạo lại và xóa trận vòng bảng. Nhập mật khẩu chốt để xác nhận.',
+    ),
     confirmLabel: 'Mở khóa',
   }
 }

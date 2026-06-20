@@ -18,7 +18,13 @@ export function SectionLockButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={disabled ? disabledTitle : locked ? 'Đã chốt — nhập mật khẩu để mở khóa' : 'Chốt bằng mật khẩu'}
+      title={
+        disabled
+          ? disabledTitle
+          : locked
+            ? 'Đã chốt — nhập mật khẩu chốt (event + 1) để mở khóa'
+            : 'Chốt bằng mật khẩu event + 1'
+      }
       className={cn(
         'shrink-0 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap',
         disabled && 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-400',

@@ -1991,16 +1991,18 @@ export function EventPage() {
       {setupLockConfirm && (
         <EventCodeDialog
           open
-          title={getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action).title}
+          title={getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action, event).title}
           message={
-            getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action).message
+            getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action, event).message
           }
           value={setupLockPassword}
           inputType="password"
-          placeholder="Nhập mật khẩu"
+          placeholder={
+            event.accessPassword ? 'Mật khẩu chốt (event + 1)' : 'Mật khẩu tab Cài đặt'
+          }
           error={setupLockPasswordError}
           confirmLabel={
-            getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action).confirmLabel
+            getSetupLockConfirmMessage(setupLockConfirm.key, setupLockConfirm.action, event).confirmLabel
           }
           onChange={(value) => {
             setSetupLockPassword(value)
