@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react'
+import {
+  getEventPasswordValidationError,
+  MIN_EVENT_PASSWORD_LENGTH,
+} from '../lib/eventAccess'
 import { getDefaultShowmatchName } from '../lib/showmatch'
 import type { EventType } from '../types'
 
@@ -12,12 +16,14 @@ interface CreateEventDialogProps {
 export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEventDialogProps) {
   const [eventName, setEventName] = useState('')
   const [eventPassword, setEventPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [eventType, setEventType] = useState<EventType>('tournament')
 
   useEffect(() => {
     if (open) {
       setEventName('')
       setEventPassword('')
+      setPasswordError(null)
       setEventType('tournament')
     }
   }, [open])
@@ -27,8 +33,20 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
   const handleSubmit = () => {
     const name = eventName.trim()
     if (!name || saving) return
+
+    const passwordErrorMessage = getEventPasswordValidationError(eventPassword)
+    if (passwordErrorMessage) {
+      setPasswordError(passwordErrorMessage)
+      return
+    }
+
     onCreate({ name, password: eventPassword, eventType })
   }
+
+  const canSubmit =
+    !saving &&
+    eventName.trim().length > 0 &&
+    eventPassword.length >= MIN_EVENT_PASSWORD_LENGTH
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -88,11 +106,16 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
           <input
             type="password"
             value={eventPassword}
-            onChange={(e) => setEventPassword(e.target.value)}
+            onChange={(e) => {
+              setEventPassword(e.target.value)
+              if (passwordError) setPasswordError(null)
+            }}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            placeholder="Password event (không bắt buộc)"
+            placeholder={`Password event (tối thiểu ${MIN_EVENT_PASSWORD_LENGTH} ký tự)`}
+            minLength={MIN_EVENT_PASSWORD_LENGTH}
             className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
           />
+          {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -107,7 +130,7 @@ export function CreateEventDialog({ open, saving, onClose, onCreate }: CreateEve
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={saving || !eventName.trim()}
+            disabled={!canSubmit}
             className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
           >
             {saving ? 'Đang lưu...' : 'Tạo'}

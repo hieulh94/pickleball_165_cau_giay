@@ -14,7 +14,12 @@ import { FilterChip } from '../components/ui/FilterChip'
 import { SearchInput } from '../components/ui/SearchInput'
 import { SectionLabel } from '../components/ui/SectionLabel'
 import { isFirebaseConfigured } from '../lib/firebase'
-import { grantEventAccess, grantEventViewAccess, resolveEventPasswordInput } from '../lib/eventAccess'
+import {
+  getEventPasswordValidationError,
+  grantEventAccess,
+  grantEventViewAccess,
+  resolveEventPasswordInput,
+} from '../lib/eventAccess'
 import { deleteEvent, subscribeEvents, upsertEvent } from '../lib/storage'
 import { computeDashboardStats } from '../lib/dashboardStats'
 import type { EventType, PickleballEvent } from '../types'
@@ -138,6 +143,13 @@ export function HomePage() {
     eventType: EventType
   }) => {
     if (saving) return
+
+    const passwordError = getEventPasswordValidationError(password)
+    if (passwordError) {
+      alert(passwordError)
+      return
+    }
+
     const code = generateEventCode()
 
     const newEvent: PickleballEvent = {

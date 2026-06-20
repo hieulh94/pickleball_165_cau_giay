@@ -1,6 +1,14 @@
 const STORAGE_KEY = 'pickleball_event_access'
 
 export const EVENT_VIEW_ONLY_PASSWORD = '0'
+export const MIN_EVENT_PASSWORD_LENGTH = 3
+
+export function getEventPasswordValidationError(password: string): string | null {
+  if (password.length < MIN_EVENT_PASSWORD_LENGTH) {
+    return `Mật khẩu cần ít nhất ${MIN_EVENT_PASSWORD_LENGTH} ký tự.`
+  }
+  return null
+}
 
 type EventAccessLevel = 'edit' | 'view'
 
