@@ -20,9 +20,10 @@ import type { Match, PickleballEvent, ShowmatchGame } from '../types'
 interface ShowMatchEventPageProps {
   event: PickleballEvent
   onPersist: (updated: PickleballEvent) => Promise<void>
+  readOnly?: boolean
 }
 
-export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps) {
+export function ShowMatchEventPage({ event, onPersist, readOnly = false }: ShowMatchEventPageProps) {
   const navigate = useNavigate()
   const [isEditingEventName, setIsEditingEventName] = useState(false)
   const [eventNameInput, setEventNameInput] = useState('')
@@ -267,9 +268,16 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
             setIsEditingEventName(false)
             setEventNameInput('')
           }}
-          onDelete={() => setDeleteConfirmOpen(true)}
+          onDelete={readOnly ? undefined : () => setDeleteConfirmOpen(true)}
+          readOnly={readOnly}
         />
       </div>
+
+      {readOnly && (
+        <p className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          Chế độ chỉ xem — nhập mật khẩu quản lý để chỉnh sửa.
+        </p>
+      )}
 
       <div className="pb-8 landscape-short:pb-3">
         <div className="pt-2">
@@ -285,6 +293,7 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
             onEditMatch={setEditingMatch}
             onUpdateResult={setSelectedMatch}
             onEditBeer={setBeerMatch}
+            readOnly={readOnly}
           />
         </div>
       </div>

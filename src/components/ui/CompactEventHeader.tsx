@@ -16,6 +16,7 @@ interface CompactEventHeaderProps {
   onCancelRename: () => void
   onDuplicate?: () => void
   onDelete?: () => void
+  readOnly?: boolean
 }
 
 const menuItems = (
@@ -49,6 +50,7 @@ export function CompactEventHeader({
   onCancelRename,
   onDuplicate,
   onDelete,
+  readOnly = false,
 }: CompactEventHeaderProps) {
   if (isEditingName) {
     return (
@@ -121,7 +123,9 @@ export function CompactEventHeader({
         )}
       </div>
 
-      <DropdownMenu items={menuItems(onStartRename, onDuplicate, onDelete)} />
+      {!readOnly && (
+        <DropdownMenu items={menuItems(onStartRename, onDuplicate, onDelete)} />
+      )}
     </header>
   )
 }

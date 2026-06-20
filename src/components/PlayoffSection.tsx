@@ -57,6 +57,7 @@ interface PlayoffSectionProps {
   standingsGroups: GroupStandings[]
   splitGroups: boolean
   pairNumberById: Map<string, number>
+  readOnly?: boolean
   onCreateMatch: (input: {
     name: string
     court: number
@@ -108,6 +109,7 @@ export function PlayoffSection({
   standingsGroups,
   splitGroups,
   pairNumberById,
+  readOnly = false,
   onCreateMatch,
   onDeleteMatch,
   onUpdateResult,
@@ -182,6 +184,7 @@ export function PlayoffSection({
         hạng vòng bảng.
       </p>
 
+      {!readOnly && (
       <div className="rounded-2xl border border-primary-200 bg-primary-50/50 p-4 sm:p-5">
         <h4 className="text-sm font-semibold text-primary-800">Tạo trận đấu mới</h4>
 
@@ -292,6 +295,7 @@ export function PlayoffSection({
           + Tạo trận
         </button>
       </div>
+      )}
 
       {matches.length === 0 ? (
         <p className="text-center text-sm text-neutral-500">Chưa có trận vòng loại trực tiếp.</p>
@@ -326,6 +330,7 @@ export function PlayoffSection({
                       </span>
                     )}
                   </div>
+                  {!readOnly && (
                   <button
                     type="button"
                     onClick={() => onDeleteMatch(match.id)}
@@ -333,6 +338,7 @@ export function PlayoffSection({
                   >
                     Xóa
                   </button>
+                  )}
                 </div>
 
                 <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-stretch gap-2">
@@ -349,6 +355,7 @@ export function PlayoffSection({
                   </p>
                 )}
 
+                {!readOnly && (
                 <button
                   type="button"
                   onClick={() => onUpdateResult(match)}
@@ -356,6 +363,7 @@ export function PlayoffSection({
                 >
                   {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
                 </button>
+                )}
               </div>
             )
           })}

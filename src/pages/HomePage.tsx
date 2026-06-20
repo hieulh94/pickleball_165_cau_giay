@@ -14,7 +14,7 @@ import { FilterChip } from '../components/ui/FilterChip'
 import { SearchInput } from '../components/ui/SearchInput'
 import { SectionLabel } from '../components/ui/SectionLabel'
 import { isFirebaseConfigured } from '../lib/firebase'
-import { grantEventAccess } from '../lib/eventAccess'
+import { grantEventAccess, grantEventViewAccess, resolveEventPasswordInput } from '../lib/eventAccess'
 import { deleteEvent, subscribeEvents, upsertEvent } from '../lib/storage'
 import { computeDashboardStats } from '../lib/dashboardStats'
 import type { EventType, PickleballEvent } from '../types'
@@ -187,22 +187,33 @@ export function HomePage() {
     if (!pendingEvent || !pendingAction) return
 
     const expectedPassword = getEventPassword(pendingEvent)
-    if (codeInput !== expectedPassword) {
+    const action = pendingAction
+    const targetEvent = pendingEvent
+
+    if (action === 'delete') {
+      if (codeInput !== expectedPassword) {
+        setCodeError('Password không đúng.')
+        return
+      }
+      closeCodeDialog()
+      setDeleteConfirmEvent(targetEvent)
+      return
+    }
+
+    const access = resolveEventPasswordInput(codeInput, expectedPassword)
+    if (access === 'invalid') {
       setCodeError('Password không đúng.')
       return
     }
 
-    const action = pendingAction
-    const targetEvent = pendingEvent
     closeCodeDialog()
 
-    if (action === 'manage' || action === 'join') {
+    if (access === 'view') {
+      grantEventViewAccess(targetEvent.id)
+    } else {
       grantEventAccess(targetEvent.id)
-      navigate(`/event/${targetEvent.id}`)
-      return
     }
-
-    setDeleteConfirmEvent(targetEvent)
+    navigate(`/event/${targetEvent.id}`)
   }
 
   const handleConfirmDelete = async () => {
@@ -373,7 +384,7 @@ export function HomePage() {
               ? 'Nhập password để vào xem event'
               : 'Nhập password để vào quản lý'
         }
-        message="Password event không hiển thị và chỉ người tạo biết."
+        message="Nhập mật khẩu quản lý, hoặc 0 để chỉ xem (không chỉnh sửa)."
         value={codeInput}
         inputType="password"
         placeholder="Nhập password event"

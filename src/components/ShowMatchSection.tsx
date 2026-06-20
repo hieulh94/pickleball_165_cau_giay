@@ -65,6 +65,7 @@ function ShowMatchCard({
   onEditMatch,
   onUpdateResult,
   onEditBeer,
+  readOnly = false,
 }: {
   match: Match
   pairs: Pair[]
@@ -74,6 +75,7 @@ function ShowMatchCard({
   onEditMatch: (match: Match) => void
   onUpdateResult: (match: Match) => void
   onEditBeer: (match: Match) => void
+  readOnly?: boolean
 }) {
   const editable = canEditShowmatchInfo(match)
   const pair1 = pairs.find((p) => p.id === match.pair1Id)
@@ -117,6 +119,7 @@ function ShowMatchCard({
             </span>
           )}
         </div>
+        {!readOnly && (
         <button
           type="button"
           onClick={() => onDeleteMatch(match.id)}
@@ -124,6 +127,7 @@ function ShowMatchCard({
         >
           Xóa
         </button>
+        )}
       </div>
 
       <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-stretch gap-2">
@@ -153,6 +157,7 @@ function ShowMatchCard({
         </p>
       )}
 
+      {!readOnly && (
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <button
           type="button"
@@ -178,6 +183,7 @@ function ShowMatchCard({
           {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
         </button>
       </div>
+      )}
     </div>
   )
 }
@@ -193,6 +199,7 @@ function ShowmatchWeekBlock({
   onEditMatch,
   onUpdateResult,
   onEditBeer,
+  readOnly = false,
 }: {
   group: ShowmatchWeekGroup
   expanded: boolean
@@ -204,6 +211,7 @@ function ShowmatchWeekBlock({
   onEditMatch: (match: Match) => void
   onUpdateResult: (match: Match) => void
   onEditBeer: (match: Match) => void
+  readOnly?: boolean
 }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
@@ -254,6 +262,7 @@ function ShowmatchWeekBlock({
                 onEditMatch={onEditMatch}
                 onUpdateResult={onUpdateResult}
                 onEditBeer={onEditBeer}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -282,6 +291,7 @@ interface ShowMatchSectionProps {
   onEditMatch: (match: Match) => void
   onUpdateResult: (match: Match) => void
   onEditBeer: (match: Match) => void
+  readOnly?: boolean
 }
 
 export function ShowMatchSection({
@@ -296,6 +306,7 @@ export function ShowMatchSection({
   onEditMatch,
   onUpdateResult,
   onEditBeer,
+  readOnly = false,
 }: ShowMatchSectionProps) {
   const today = new Date().toISOString().slice(0, 10)
   const [name, setName] = useState('')
@@ -353,6 +364,7 @@ export function ShowMatchSection({
 
   return (
     <div className="space-y-6">
+      {!readOnly && (
       <CollapsibleSection
         title="Lịch showmatch"
         description="Tạo trận với ngày giờ và tên người chơi"
@@ -472,6 +484,7 @@ export function ShowMatchSection({
 
         </div>
       </CollapsibleSection>
+      )}
 
       <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-neutral-900">Lịch thi đấu</h3>
@@ -493,6 +506,7 @@ export function ShowMatchSection({
               onEditMatch={onEditMatch}
               onUpdateResult={onUpdateResult}
               onEditBeer={onEditBeer}
+              readOnly={readOnly}
             />
           ))}
           </div>

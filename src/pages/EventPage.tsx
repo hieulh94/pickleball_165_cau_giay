@@ -45,7 +45,10 @@ import { generateSchedule } from '../lib/schedule'
 import {
   eventRequiresPassword,
   grantEventAccess,
+  grantEventViewAccess,
   isEventAccessGranted,
+  isEventViewOnlyAccess,
+  resolveEventPasswordInput,
 } from '../lib/eventAccess'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { deleteEvent, subscribeEvent, upsertEvent } from '../lib/storage'
@@ -207,11 +210,19 @@ export function EventPage() {
   }
 
   const handleRequestDeleteEvent = () => {
+    if (id && isEventViewOnlyAccess(id)) {
+      alert('Chế độ chỉ xem — không thể xóa event.')
+      return
+    }
     setDeleteConfirmOpen(true)
   }
 
   const handleConfirmDeleteEvent = async () => {
     if (!event) return
+    if (id && isEventViewOnlyAccess(id)) {
+      alert('Chế độ chỉ xem — không thể xóa event.')
+      return
+    }
     setDeleteConfirmOpen(false)
     try {
       await deleteEvent(event.id)
@@ -260,6 +271,10 @@ export function EventPage() {
   }, [])
 
   const persist = async (updated: PickleballEvent) => {
+    if (id && isEventViewOnlyAccess(id)) {
+      alert('Chế độ chỉ xem — không thể chỉnh sửa. Nhập mật khẩu quản lý để có quyền sửa.')
+      return
+    }
     try {
       await upsertEvent(updated)
     } catch (err) {
@@ -425,15 +440,23 @@ export function EventPage() {
 
   const handlePasswordConfirm = () => {
     if (!id) return
-    if (passwordInput !== event.accessPassword) {
+    const access = resolveEventPasswordInput(passwordInput, event.accessPassword)
+    if (access === 'invalid') {
       setPasswordError('Mật khẩu không đúng.')
       return
     }
-    grantEventAccess(id)
+    if (access === 'view') {
+      grantEventViewAccess(id)
+    } else {
+      grantEventAccess(id)
+    }
     setAccessGranted(true)
     setPasswordInput('')
     setPasswordError(null)
   }
+
+  const readOnly = Boolean(id && accessGranted && isEventViewOnlyAccess(id))
+  const canEdit = !readOnly
 
   if (!accessGranted && eventRequiresPassword(event.accessPassword)) {
     return (
@@ -448,7 +471,7 @@ export function EventPage() {
         <EventCodeDialog
           open
           title="Nhập mật khẩu"
-          message="Nhập mật khẩu event do ban tổ chức cung cấp."
+          message="Nhập mật khẩu quản lý, hoặc 0 để chỉ xem (không chỉnh sửa)."
           value={passwordInput}
           inputType="password"
           placeholder="Nhập mật khẩu event"
@@ -466,7 +489,15 @@ export function EventPage() {
   }
 
   if (event.eventType === 'showmatch') {
-    return <ShowMatchEventPage event={event} onPersist={persist} />
+    return <ShowMatchEventPage event={event} onPersist={persist} readOnly={readOnly} />
+  }
+
+  const denyIfReadOnly = (): boolean => {
+    if (!canEdit) {
+      alert('Chế độ chỉ xem — không thể chỉnh sửa. Nhập mật khẩu quản lý để có quyền sửa.')
+      return true
+    }
+    return false
   }
 
   const addParticipants = (rawNames: string[]) => {
@@ -500,6 +531,7 @@ export function EventPage() {
   }
 
   const requestSetupLockToggle = (key: SetupLockKey) => {
+    if (denyIfReadOnly()) return
     const locked = isSetupLocked(event, key)
     if (!locked) {
       const reason = getSetupLockBlockReason(
@@ -1182,9 +1214,16 @@ export function EventPage() {
             setIsEditingEventName(false)
             setEventNameInput('')
           }}
-          onDelete={handleRequestDeleteEvent}
+          onDelete={canEdit ? handleRequestDeleteEvent : undefined}
+          readOnly={readOnly}
         />
       </div>
+
+      {readOnly && (
+        <p className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          Chế độ chỉ xem — nhập mật khẩu quản lý để chỉnh sửa.
+        </p>
+      )}
 
       <div className="pb-8 landscape-short:pb-3">
         <SectionNavBar
@@ -1195,6 +1234,10 @@ export function EventPage() {
           onHideAll={hideAllSections}
           dialogSections={['contribution']}
           onDialogOpen={(key) => {
+            if (!canEdit) {
+              denyIfReadOnly()
+              return
+            }
             if (key === 'contribution') setContributionDialogOpen(true)
           }}
         />
@@ -1206,10 +1249,12 @@ export function EventPage() {
         description="Chọn nhiều người từ danh sách CLB, gán trình độ (1 hoặc 2)"
         visible={sectionVisibility.participants}
         headerExtra={
+          canEdit ? (
           <SectionLockButton
             locked={event.participantsLocked === true}
             onClick={() => requestSetupLockToggle('participants')}
           />
+          ) : null
         }
       >
         {event.participantsLocked && (
@@ -1219,7 +1264,7 @@ export function EventPage() {
         )}
         <Button
           onClick={() => setParticipantPickerOpen(true)}
-          disabled={event.participantsLocked}
+          disabled={!canEdit || event.participantsLocked}
         >
           + Chọn người chơi
         </Button>
@@ -1243,7 +1288,7 @@ export function EventPage() {
                     <SkillLevelBadge level={p.skillLevel} className="mt-1" />
                   ) : null}
                 </div>
-                {!event.participantsLocked && (
+                {canEdit && !event.participantsLocked && (
                   <button
                     type="button"
                     onClick={() => setParticipantToDelete(p.id)}
@@ -1268,6 +1313,7 @@ export function EventPage() {
         description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
         headerExtra={
+          canEdit ? (
           <div className="flex flex-wrap items-center gap-2">
             <SectionLockButton
               locked={event.pairsLocked === true}
@@ -1322,6 +1368,7 @@ export function EventPage() {
               />
             ) : null}
           </div>
+          ) : null
         }
       >
         {event.pairsLocked && (
@@ -1336,7 +1383,7 @@ export function EventPage() {
         )}
         <Button
           onClick={requestRandomPairs}
-          disabled={event.pairsLocked}
+          disabled={!canEdit || event.pairsLocked}
           className="bg-neutral-900 hover:bg-neutral-800"
         >
           🎲 Random cặp đôi
@@ -1344,7 +1391,7 @@ export function EventPage() {
 
         <div
           className={`mt-4 rounded-xl border border-primary-200 bg-primary-50 p-4 ${
-            event.pairsLocked ? 'pointer-events-none opacity-60' : ''
+            !canEdit || event.pairsLocked ? 'pointer-events-none opacity-60' : ''
           }`}
         >
           <p className="text-sm font-semibold text-primary-800">✋ Hoặc ghép tay cặp đôi</p>
@@ -1388,7 +1435,7 @@ export function EventPage() {
           </p>
         </div>
 
-        {event.pairs.length > 0 && event.splitGroups && !event.groupsLocked && (
+        {canEdit && event.pairs.length > 0 && event.splitGroups && !event.groupsLocked && (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
@@ -1445,7 +1492,7 @@ export function EventPage() {
                       <div key={pair.id} className={pairCardClassName(pairNumber)}>
                         <div className="flex items-start justify-between gap-2">
                           <p className="font-bold">Cặp {pairNumber}</p>
-                          {event.splitGroups && !event.groupsLocked && (
+                          {canEdit && event.splitGroups && !event.groupsLocked && (
                             <PairGroupSelect
                               value={pair.group}
                               groupCount={resolvedGroupCount}
@@ -1481,12 +1528,14 @@ export function EventPage() {
         description="Thêm sân, rồi tạo lịch tự động hoặc thêm từng trận thủ công"
         visible={sectionVisibility.schedule}
         headerExtra={
+          canEdit ? (
           <SectionLockButton
             locked={event.scheduleLocked === true}
             disabled={!event.scheduleLocked && !!scheduleLockBlockReason}
             disabledTitle={scheduleLockBlockReason ?? undefined}
             onClick={() => requestSetupLockToggle('schedule')}
           />
+          ) : null
         }
       >
         {event.scheduleLocked && (
@@ -1496,7 +1545,7 @@ export function EventPage() {
         )}
         <div
           className={`flex flex-wrap items-end gap-3 ${
-            event.scheduleLocked ? 'pointer-events-none opacity-60' : ''
+            !canEdit || event.scheduleLocked ? 'pointer-events-none opacity-60' : ''
           }`}
         >
           <div>
@@ -1547,7 +1596,7 @@ export function EventPage() {
           </p>
         )}
 
-        {event.pairs.length >= 2 && !event.scheduleLocked && (
+        {canEdit && event.pairs.length >= 2 && !event.scheduleLocked && (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -1572,7 +1621,8 @@ export function EventPage() {
           </div>
         )}
 
-        {scheduleCreateMode === 'manual' &&
+        {canEdit &&
+          scheduleCreateMode === 'manual' &&
           !event.scheduleLocked &&
           event.courts.length > 0 &&
           event.pairs.length >= 2 && (
@@ -1698,7 +1748,7 @@ export function EventPage() {
                                   </span>
                                 )}
                               </div>
-                              {!event.scheduleLocked && (
+                              {canEdit && !event.scheduleLocked && (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteGroupMatch(match.id)}
@@ -1733,6 +1783,7 @@ export function EventPage() {
                               </p>
                             )}
 
+                            {canEdit && (
                             <button
                               type="button"
                               onClick={() => setSelectedMatch(match)}
@@ -1740,6 +1791,7 @@ export function EventPage() {
                             >
                               {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
                             </button>
+                            )}
                           </div>
                         )
                       })}
@@ -1790,6 +1842,7 @@ export function EventPage() {
             standingsGroups={standings}
             splitGroups={event.splitGroups}
             pairNumberById={pairNumberById}
+            readOnly={readOnly}
             onCreateMatch={handleCreatePlayoffMatch}
             onDeleteMatch={handleDeletePlayoffMatch}
             onUpdateResult={setSelectedMatch}
