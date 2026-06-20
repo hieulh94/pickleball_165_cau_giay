@@ -84,7 +84,7 @@ export function CompactEventHeader({
   }
 
   return (
-    <header className="flex min-h-9 items-center gap-2 sm:gap-3">
+    <header className="flex min-h-9 items-center gap-2 sm:gap-3 landscape-short:min-h-0 landscape-short:gap-1.5">
       <Link
         to="/"
         className="shrink-0 text-xs font-medium text-primary-600 transition hover:text-primary-700 hover:underline"

@@ -26,8 +26,8 @@ export function PairScheduleDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative flex max-h-[min(85vh,40rem)] w-full max-w-lg flex-col rounded-xl border border-neutral-200 bg-white shadow-xl">
-        <div className="border-b border-neutral-100 px-5 py-4">
+      <div className="relative flex max-h-[min(85dvh,40rem)] w-full max-w-lg flex-col rounded-xl border border-neutral-200 bg-white shadow-xl landscape-short:max-h-[calc(100dvh-1rem)] landscape-short:rounded-lg">
+        <div className="border-b border-neutral-100 px-5 py-4 landscape-short:px-4 landscape-short:py-2.5">
           <div className="flex items-start gap-3">
             <span
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-xs font-bold ${color.border} ${color.bg} ${color.text}`}
@@ -36,7 +36,7 @@ export function PairScheduleDialog({
               Cặp {pairNumber}
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-neutral-900">Lịch thi đấu</h3>
+              <h3 className="text-lg font-semibold text-neutral-900 landscape-short:text-base">Lịch thi đấu</h3>
               <p className="mt-0.5 text-sm text-neutral-600">{pairLabel}</p>
             </div>
           </div>

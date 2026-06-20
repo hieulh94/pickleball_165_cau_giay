@@ -45,7 +45,7 @@ export function SectionNavBar({
   }
 
   return (
-    <div className="sticky top-0 z-20 border-b border-border bg-card/95 py-2 backdrop-blur-sm">
+    <div className="sticky top-0 z-20 border-b border-border bg-card/95 py-2 backdrop-blur-sm landscape-short:py-1">
       <div className="flex items-center gap-2">
         <nav
           className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -57,7 +57,7 @@ export function SectionNavBar({
               type="button"
               onClick={() => scrollToSection(key)}
               className={cn(
-                'shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition',
+                'shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition landscape-short:px-2 landscape-short:py-1 landscape-short:text-xs',
                 visibility[key]
                   ? 'text-text-primary hover:bg-surface-muted'
                   : 'text-text-secondary/60 line-through hover:bg-surface-muted',

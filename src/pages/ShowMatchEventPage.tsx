@@ -249,8 +249,8 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 pb-2 pt-1">
+    <div className="flex flex-col">
+      <div className="shrink-0 pb-2 pt-1 landscape-short:pb-1 landscape-short:pt-0">
         <CompactEventHeader
           name={event.name}
           accessCode={event.accessCode}
@@ -271,7 +271,7 @@ export function ShowMatchEventPage({ event, onPersist }: ShowMatchEventPageProps
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+      <div className="pb-8 landscape-short:pb-3">
         <div className="pt-2">
           <ShowMatchSection
             pairs={event.pairs}

@@ -48,12 +48,13 @@ export function Layout() {
   const isLeaderboardTab = activeTab === 'leaderboard' && !isEventDetail
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-surface pb-16 lg:pb-0">
+    <div className="flex min-h-dvh bg-surface pb-16 landscape-short:pb-11 lg:min-h-screen lg:pb-0">
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="z-50 shrink-0 border-b border-border bg-card">
-          <div className="px-4 py-3 sm:px-6 lg:px-8">
+        {!isEventDetail && (
+        <header className="z-50 shrink-0 border-b border-border bg-card landscape-short:py-0">
+          <div className="px-4 py-3 landscape-short:py-2 sm:px-6 lg:px-8">
             {isLeaderboardTab ? (
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <Link
@@ -90,14 +91,14 @@ export function Layout() {
                   className="flex min-w-0 items-center gap-2.5 sm:gap-3"
                   onClick={() => handleTabChange('overview')}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white shadow-sm">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white shadow-sm landscape-short:h-8 landscape-short:w-8 landscape-short:text-xs">
                     P
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-text-primary sm:text-lg">
+                    <p className="truncate text-base font-semibold text-text-primary sm:text-lg landscape-short:text-sm">
                       Pickleball 165 Cầu Giấy
                     </p>
-                    <p className="text-[11px] text-text-secondary sm:text-xs">CLB nội bộ</p>
+                    <p className="text-[11px] text-text-secondary sm:text-xs landscape-short:hidden">CLB nội bộ</p>
                     {showHeaderStats && (
                       <p className="mt-1 text-xs text-text-secondary">
                         <span className="font-medium text-text-primary">{stats.eventCount}</span> Events
@@ -121,19 +122,18 @@ export function Layout() {
             )}
           </div>
         </header>
+        )}
 
         {isHomeTab ? (
           <main
-            className={`mx-auto w-full max-w-7xl min-h-0 flex-1 px-4 sm:px-6 lg:px-8 ${
-              isEventDetail ? 'flex flex-col overflow-hidden' : 'overflow-y-auto py-6 sm:py-8'
+            className={`mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8 landscape-short:px-3 ${
+              isEventDetail ? 'flex flex-col landscape-short:py-1' : 'py-6 sm:py-8 landscape-short:py-3'
             }`}
           >
             <Outlet context={{ createRequest, activeTab } satisfies LayoutOutletContext} />
           </main>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <ContributionLeaderboardPanel />
-          </div>
+          <ContributionLeaderboardPanel />
         )}
       </div>
 

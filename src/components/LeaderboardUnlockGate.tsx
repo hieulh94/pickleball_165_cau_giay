@@ -51,7 +51,7 @@ export function LeaderboardUnlockGate({ onUnlock }: LeaderboardUnlockGateProps) 
   }
 
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8">
+    <div className="flex items-center justify-center px-4 py-8">
       <section className="w-full max-w-md">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
           <div className="flex flex-col items-center text-center">

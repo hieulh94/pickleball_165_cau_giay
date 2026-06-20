@@ -95,7 +95,8 @@ export function ManualSchedulePanel({
   return (
     <div className="mt-4 rounded-xl border border-primary-200 bg-secondary-50/50 p-4 sm:p-5">
       <p className="text-xs text-secondary-700/80">
-        Thêm từng trận vòng bảng: chọn vòng, sân và hai cặp đấu.
+        Thêm từng trận vòng bảng: chọn vòng, sân và hai cặp đấu. Có thể thêm cùng một cặp đối đầu
+        nhiều lần (lượt đi / lượt về) ở các vòng khác nhau.
       </p>
 
       <div className="mt-4 space-y-3">

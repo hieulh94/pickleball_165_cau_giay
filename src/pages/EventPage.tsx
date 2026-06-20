@@ -108,7 +108,7 @@ function PairDisplayCard({
 }) {
   if (!pair || pairNumber < 1) {
     return (
-      <div className="flex h-full min-h-[5.5rem] w-full items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-sm text-neutral-400">
+      <div className="flex h-full min-h-[5.5rem] w-full items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 text-sm text-neutral-400 landscape-short:min-h-[3rem]">
         —
       </div>
     )
@@ -119,14 +119,14 @@ function PairDisplayCard({
 
   return (
     <div
-      className={`flex h-full min-h-[5.5rem] w-full flex-col items-center justify-center border-2 text-center ${color.border} ${color.bg} rounded-xl px-2 py-3 shadow-sm`}
+      className={`flex h-full min-h-[5.5rem] w-full flex-col items-center justify-center border-2 text-center landscape-short:min-h-[3.5rem] landscape-short:px-1.5 landscape-short:py-2 ${color.border} ${color.bg} rounded-xl px-2 py-3 shadow-sm`}
     >
-      <p className={`text-sm font-bold ${color.text}`}>Cặp {pairNumber}</p>
-      <p className={`mt-1 w-full break-words text-xs font-semibold leading-tight ${color.text}`}>
+      <p className={`text-sm font-bold landscape-short:text-xs ${color.text}`}>Cặp {pairNumber}</p>
+      <p className={`mt-1 w-full break-words text-xs font-semibold leading-tight landscape-short:mt-0.5 landscape-short:text-[10px] landscape-short:leading-snug ${color.text}`}>
         {line1}
       </p>
-      <p className={`text-[10px] font-medium ${color.text} opacity-70`}>&</p>
-      <p className={`w-full break-words text-xs font-semibold leading-tight ${color.text}`}>
+      <p className={`text-[10px] font-medium landscape-short:text-[9px] ${color.text} opacity-70`}>&</p>
+      <p className={`w-full break-words text-xs font-semibold leading-tight landscape-short:text-[10px] landscape-short:leading-snug ${color.text}`}>
         {line2}
       </p>
       <div className="mt-2">
@@ -868,16 +868,6 @@ export function EventPage() {
       return
     }
 
-    const isDuplicateMatchup = groupMatches.some(
-      (m) =>
-        (m.pair1Id === input.pair1Id && m.pair2Id === input.pair2Id) ||
-        (m.pair1Id === input.pair2Id && m.pair2Id === input.pair1Id),
-    )
-    if (isDuplicateMatchup) {
-      alert('Hai cặp này đã có trận đấu trong lịch vòng bảng.')
-      return
-    }
-
     const match: Match = {
       id: crypto.randomUUID(),
       pair1Id: input.pair1Id,
@@ -1178,8 +1168,8 @@ export function EventPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 pb-2 pt-1">
+    <div className="flex flex-col">
+      <div className="shrink-0 pb-2 pt-1 landscape-short:pb-1 landscape-short:pt-0">
         <CompactEventHeader
           name={event.name}
           accessCode={event.accessCode}
@@ -1196,7 +1186,7 @@ export function EventPage() {
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+      <div className="pb-8 landscape-short:pb-3">
         <SectionNavBar
           availableSections={availableSections}
           visibility={sectionVisibility}
@@ -1209,7 +1199,7 @@ export function EventPage() {
           }}
         />
 
-        <div className="space-y-6 pt-4">
+        <div className="space-y-6 pt-4 landscape-short:space-y-4 landscape-short:pt-2">
       <CollapsibleSection
         id="section-participants"
         title="Người tham gia"
@@ -1618,7 +1608,7 @@ export function EventPage() {
               })}
             </div>
 
-            <div className="mt-5 space-y-8">
+            <div className="mt-5 space-y-8 landscape-short:mt-3 landscape-short:space-y-4">
               {matchesByRound.map(([round, matches]) => {
                 const playingPairIds = new Set(
                   matches.flatMap((m) => [m.pair1Id, m.pair2Id]),
@@ -1669,8 +1659,10 @@ export function EventPage() {
                     </p>
                   )}
                   <div
-                    className={`grid grid-cols-1 items-stretch gap-4 ${
-                      matches.length === 1 ? 'max-w-xl' : 'md:grid-cols-2'
+                    className={`grid grid-cols-1 items-stretch gap-4 landscape-short:gap-2 ${
+                      matches.length === 1
+                        ? 'max-w-xl landscape-short:max-w-none'
+                        : 'md:grid-cols-2 landscape-short:grid-cols-2'
                     }`}
                   >
                     {matches
@@ -1684,13 +1676,13 @@ export function EventPage() {
                         return (
                           <div
                             key={match.id}
-                            className={`flex h-full flex-col rounded-2xl border p-4 shadow-sm ${
+                            className={`flex h-full flex-col rounded-2xl border p-4 shadow-sm landscape-short:p-2.5 ${
                               match.completed
                                 ? 'border-secondary-500 bg-secondary-50'
                                 : 'border-neutral-200 bg-white'
                             }`}
                           >
-                            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 landscape-short:mb-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="rounded-lg bg-neutral-800 px-2.5 py-1 text-xs font-bold text-white">
                                   Sân {match.court}
@@ -1717,14 +1709,14 @@ export function EventPage() {
                               )}
                             </div>
 
-                            <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-stretch gap-2">
+                            <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-stretch gap-2 landscape-short:grid-cols-[minmax(0,1fr)_1.75rem_minmax(0,1fr)] landscape-short:gap-1">
                               <PairDisplayCard
                                 pair={pair1}
                                 pairNumber={pair1Number}
                                 participants={event.participants}
                               />
                               <div className="flex items-center justify-center">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-bold text-neutral-700">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-bold text-neutral-700 landscape-short:h-6 landscape-short:w-6 landscape-short:text-[10px]">
                                   VS
                                 </span>
                               </div>
@@ -1736,7 +1728,7 @@ export function EventPage() {
                             </div>
 
                             {match.completed && (
-                              <p className="my-4 text-center text-2xl font-bold text-primary-600">
+                              <p className="my-4 text-center text-2xl font-bold text-primary-600 landscape-short:my-2 landscape-short:text-xl">
                                 {match.score1} – {match.score2}
                               </p>
                             )}
@@ -1744,7 +1736,7 @@ export function EventPage() {
                             <button
                               type="button"
                               onClick={() => setSelectedMatch(match)}
-                              className="mt-4 w-full rounded-lg border border-secondary-500 bg-secondary-50 py-2.5 text-sm font-semibold text-secondary-700 hover:bg-secondary-50"
+                              className="mt-4 w-full rounded-lg border border-secondary-500 bg-secondary-50 py-2.5 text-sm font-semibold text-secondary-700 hover:bg-secondary-50 landscape-short:mt-2 landscape-short:py-2 landscape-short:text-xs"
                             >
                               {match.completed ? 'Sửa kết quả' : 'Cập nhật kết quả'}
                             </button>

@@ -64,7 +64,7 @@ export function ContributionLeaderboardPanel() {
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden">
+    <div className="mx-auto w-full max-w-5xl">
       <div className="shrink-0 border-b border-border/60 px-4 py-2">
         <LeaderboardFilters
           period={period}
@@ -85,7 +85,7 @@ export function ContributionLeaderboardPanel() {
         </p>
       ) : (
         <>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4">
+          <div className="px-4 pb-4">
             <div className="rounded-2xl border border-border bg-card shadow-sm">
               <LeaderboardPodium
                 standings={podiumStandings}

@@ -33,10 +33,10 @@ export function CollapsibleSection({
         className ?? 'mt-0',
       )}
     >
-      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 landscape-short:gap-2 landscape-short:px-3 landscape-short:py-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 w-full sm:flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[22px] font-semibold leading-tight text-text-primary">{title}</h2>
+            <h2 className="text-[22px] font-semibold leading-tight text-text-primary landscape-short:text-lg">{title}</h2>
             {!visible && onToggle && (
               <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-text-secondary">
                 Đang ẩn
@@ -44,7 +44,7 @@ export function CollapsibleSection({
             )}
           </div>
           {description && visible && (
-            <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{description}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-text-secondary landscape-short:line-clamp-2">{description}</p>
           )}
         </div>
         {(headerExtra || onToggle) && (
@@ -64,7 +64,7 @@ export function CollapsibleSection({
         )}
       </div>
 
-      {visible && <div className="p-4">{children}</div>}
+      {visible && <div className="p-4 landscape-short:p-3">{children}</div>}
     </section>
   )
 }

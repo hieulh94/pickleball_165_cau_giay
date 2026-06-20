@@ -58,8 +58,8 @@ const TABS: { id: NavTab; label: string; Icon: typeof OverviewIcon }[] = [
 
 export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(15,23,42,0.04)] lg:hidden">
-      <div className="mx-auto grid max-w-7xl grid-cols-5">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(15,23,42,0.04)] landscape-short:shadow-none lg:hidden">
+      <div className="mx-auto grid max-w-7xl grid-cols-5 landscape-short:grid-cols-5">
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id
           return (
@@ -67,12 +67,12 @@ export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`flex flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+              className={`flex flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-semibold uppercase tracking-wide transition landscape-short:flex-row landscape-short:justify-center landscape-short:gap-1.5 landscape-short:py-1.5 landscape-short:text-[9px] landscape-short:[&_svg]:h-5 landscape-short:[&_svg]:w-5 ${
                 active ? 'text-primary-600' : 'text-neutral-400 hover:text-neutral-600'
               }`}
             >
               <Icon />
-              {label}
+              <span className="landscape-short:truncate">{label}</span>
             </button>
           )
         })}
