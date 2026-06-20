@@ -43,6 +43,10 @@ import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { getPairScheduleEntries } from '../lib/pairSchedule'
 import { generateSchedule } from '../lib/schedule'
 import {
+  loadSectionVisibility,
+  saveSectionVisibility,
+} from '../lib/sectionVisibilityStorage'
+import {
   eventRequiresPassword,
   grantEventAccess,
   grantEventViewAccess,
@@ -190,23 +194,35 @@ export function EventPage() {
   const [setupLockPassword, setSetupLockPassword] = useState('')
   const [setupLockPasswordError, setSetupLockPasswordError] = useState<string | null>(null)
 
+  const updateSectionVisibility = (
+    updater: (
+      prev: Record<SectionKey, boolean>,
+    ) => Record<SectionKey, boolean>,
+  ) => {
+    setSectionVisibility((prev) => {
+      const next = updater(prev)
+      if (id) saveSectionVisibility(id, next)
+      return next
+    })
+  }
+
   const setSectionVisible = (key: SectionKey, visible: boolean) => {
-    setSectionVisibility((prev) => ({ ...prev, [key]: visible }))
+    updateSectionVisibility((prev) => ({ ...prev, [key]: visible }))
   }
 
   const showAllSections = () => {
-    setSectionVisibility({ ...DEFAULT_SECTION_VISIBILITY })
+    updateSectionVisibility(() => ({ ...DEFAULT_SECTION_VISIBILITY }))
   }
 
   const hideAllSections = () => {
-    setSectionVisibility({
+    updateSectionVisibility(() => ({
       participants: false,
       pairs: false,
       schedule: false,
       standings: false,
       playoffs: false,
       contribution: false,
-    })
+    }))
   }
 
   const handleRequestDeleteEvent = () => {
@@ -263,6 +279,11 @@ export function EventPage() {
 
     setAccessGranted(isEventAccessGranted(id))
   }, [id, event])
+
+  useEffect(() => {
+    if (!id) return
+    setSectionVisibility(loadSectionVisibility(id))
+  }, [id])
 
   const finishRandomWheel = useCallback(() => {
     setRandomWheelSession(null)
