@@ -22,7 +22,7 @@ import {
   resolveGroupCount,
   UNASSIGNED_GROUP_LABEL,
 } from '../lib/groups'
-import { filterGroupMatches, filterPlayoffMatches, isGroupMatch } from '../lib/matches'
+import { filterGroupMatches, filterPlayoffMatches, isGroupMatch, isPlayoffMatch } from '../lib/matches'
 import { getPairLabel, randomPairs } from '../lib/pairing'
 import {
   areParticipantsIncompatible,
@@ -58,6 +58,14 @@ import { isFirebaseConfigured } from '../lib/firebase'
 import { deleteEvent, subscribeEvent, upsertEvent } from '../lib/storage'
 import { calculateStandings, hasCompletedMatches } from '../lib/standings'
 import {
+  applyPlayoffResult,
+  buildPlayoffMatches,
+  canRegeneratePlayoff,
+  isGroupStageComplete,
+  stripAutoPlayoffMatches,
+  validatePlayoffConfig,
+} from '../lib/playoffBracket'
+import {
   CollapsibleSection,
   DEFAULT_SECTION_VISIBILITY,
   type SectionKey,
@@ -69,7 +77,7 @@ import { ShowMatchEventPage } from './ShowMatchEventPage'
 import { Button } from '../components/ui/Button'
 import { BackLink } from '../components/ui/BackLink'
 import { CompactEventHeader } from '../components/ui/CompactEventHeader'
-import type { Match, Pair, Participant, PickleballEvent, SkillLevel } from '../types'
+import type { Match, Pair, Participant, PickleballEvent, PlayoffConfig, SkillLevel } from '../types'
 
 function isManualPair(pair: Pair) {
   return pair.isManual === true || (pair.isManual === undefined && pair.locked === true)
@@ -909,7 +917,9 @@ export function EventPage() {
 
     const sameRoundMatches = groupMatches.filter((m) => m.round === input.round)
     const pairIdsInRound = new Set(
-      sameRoundMatches.flatMap((m) => [m.pair1Id, m.pair2Id]),
+      sameRoundMatches.flatMap((m) =>
+        [m.pair1Id, m.pair2Id].filter((id): id is string => !!id),
+      ),
     )
     if (pairIdsInRound.has(input.pair1Id) || pairIdsInRound.has(input.pair2Id)) {
       alert('Mỗi cặp chỉ được thi đấu một trận trong cùng một vòng.')
@@ -1116,6 +1126,55 @@ export function EventPage() {
     persist({ ...event, matches: [...event.matches, match] })
   }
 
+  const handleSavePlayoffConfig = (config: PlayoffConfig) => {
+    const error = validatePlayoffConfig(standings, event.splitGroups, config)
+    if (error) {
+      alert(error)
+      return
+    }
+    persist({
+      ...event,
+      playoffConfig: {
+        ...config,
+        status: config.status === 'generated' ? 'generated' : 'configured',
+      },
+    })
+  }
+
+  const handleGeneratePlayoffBracket = () => {
+    if (!event.playoffConfig) {
+      alert('Hãy lưu cấu hình playoff trước.')
+      return
+    }
+    if (!isGroupStageComplete(groupMatches)) {
+      alert('Vòng bảng chưa hoàn thành.')
+      return
+    }
+    if (!canRegeneratePlayoff(event.matches)) {
+      alert('Không thể tạo lại bracket vì đã có kết quả playoff.')
+      return
+    }
+    const error = validatePlayoffConfig(standings, event.splitGroups, event.playoffConfig)
+    if (error) {
+      alert(error)
+      return
+    }
+    const autoMatches = buildPlayoffMatches(
+      standings,
+      event.playoffConfig,
+      event.courts,
+    )
+    if (autoMatches.length === 0) {
+      alert('Không tạo được trận playoff từ cấu hình hiện tại.')
+      return
+    }
+    persist({
+      ...event,
+      playoffConfig: { ...event.playoffConfig, status: 'generated' },
+      matches: [...stripAutoPlayoffMatches(event.matches), ...autoMatches],
+    })
+  }
+
   const handleDeletePlayoffMatch = (matchId: string) => {
     setMatchToDelete(matchId)
   }
@@ -1182,14 +1241,51 @@ export function EventPage() {
   }
 
   const handleUpdateResult = (matchId: string, score1: number, score2: number) => {
-    persist({
-      ...event,
-      matches: event.matches.map((m) =>
-        m.id === matchId
-          ? { ...m, score1, score2, completed: true }
-          : m,
-      ),
-    })
+    const prev = event.matches.find((m) => m.id === matchId)
+    if (!prev) return
+
+    let matches: Match[]
+    if (isPlayoffMatch(prev)) {
+      matches = applyPlayoffResult(event.matches, matchId, score1, score2)
+    } else {
+      matches = event.matches.map((m) =>
+        m.id === matchId ? { ...m, score1, score2, completed: true } : m,
+      )
+    }
+
+    let playoffConfig = event.playoffConfig
+    const nextGroupMatches = filterGroupMatches(matches)
+
+    if (
+      isGroupMatch(prev) &&
+      playoffConfig &&
+      isGroupStageComplete(nextGroupMatches) &&
+      canRegeneratePlayoff(matches)
+    ) {
+      const nextStandings = calculateStandings(
+        event.pairs,
+        nextGroupMatches,
+        event.splitGroups,
+      )
+      const error = validatePlayoffConfig(
+        nextStandings,
+        event.splitGroups,
+        playoffConfig,
+      )
+      if (!error) {
+        const autoMatches = buildPlayoffMatches(
+          nextStandings,
+          playoffConfig,
+          event.courts,
+        )
+        if (autoMatches.length > 0) {
+          matches = [...stripAutoPlayoffMatches(matches), ...autoMatches]
+          playoffConfig = { ...playoffConfig, status: 'generated' }
+        }
+      }
+    }
+
+    persist({ ...event, matches, playoffConfig })
   }
 
   const handleStartEditEventName = () => {
@@ -1682,7 +1778,9 @@ export function EventPage() {
             <div className="mt-5 space-y-8 landscape-short:mt-3 landscape-short:space-y-4">
               {matchesByRound.map(([round, matches]) => {
                 const playingPairIds = new Set(
-                  matches.flatMap((m) => [m.pair1Id, m.pair2Id]),
+                  matches.flatMap((m) =>
+                    [m.pair1Id, m.pair2Id].filter((id): id is string => !!id),
+                  ),
                 )
                 const restingPairs = event.pairs.filter(
                   (pair) => !playingPairIds.has(pair.id),
@@ -1739,10 +1837,18 @@ export function EventPage() {
                     {matches
                       .sort((a, b) => a.court - b.court)
                       .map((match) => {
-                        const pair1 = event.pairs.find((p) => p.id === match.pair1Id)
-                        const pair2 = event.pairs.find((p) => p.id === match.pair2Id)
-                        const pair1Number = pairNumberById.get(match.pair1Id) ?? 0
-                        const pair2Number = pairNumberById.get(match.pair2Id) ?? 0
+                        const pair1 = match.pair1Id
+                          ? event.pairs.find((p) => p.id === match.pair1Id)
+                          : undefined
+                        const pair2 = match.pair2Id
+                          ? event.pairs.find((p) => p.id === match.pair2Id)
+                          : undefined
+                        const pair1Number = match.pair1Id
+                          ? (pairNumberById.get(match.pair1Id) ?? 0)
+                          : 0
+                        const pair2Number = match.pair2Id
+                          ? (pairNumberById.get(match.pair2Id) ?? 0)
+                          : 0
 
                         return (
                           <div
@@ -1852,7 +1958,7 @@ export function EventPage() {
         <CollapsibleSection
           id="section-playoffs"
           title="Vòng loại trực tiếp"
-          description="Tứ kết, bán kết, chung kết — kết quả không cập nhật vào bảng xếp hạng"
+          description="Cấu hình a/b trước — tự tạo bracket từ BXH khi vòng bảng xong"
           visible={sectionVisibility.playoffs}
         >
           <PlayoffSection
@@ -1860,10 +1966,14 @@ export function EventPage() {
             participants={event.participants}
             courts={event.courts}
             matches={playoffMatches}
+            groupMatches={groupMatches}
             standingsGroups={standings}
             splitGroups={event.splitGroups}
             pairNumberById={pairNumberById}
+            playoffConfig={event.playoffConfig}
             readOnly={readOnly}
+            onSaveConfig={handleSavePlayoffConfig}
+            onGenerateBracket={handleGeneratePlayoffBracket}
             onCreateMatch={handleCreatePlayoffMatch}
             onDeleteMatch={handleDeletePlayoffMatch}
             onUpdateResult={setSelectedMatch}
@@ -1894,20 +2004,26 @@ export function EventPage() {
         open={!!selectedMatch}
         match={selectedMatch}
         team1Label={
-          selectedMatch
+          selectedMatch?.pair1Id
             ? getPairLabel(
                 event.pairs.find((p) => p.id === selectedMatch.pair1Id)!,
                 event.participants,
               )
-            : ''
+            : selectedMatch?.pair1Source?.startsWith('W:') ||
+                selectedMatch?.pair1Source?.startsWith('L:')
+              ? 'Chờ đội'
+              : (selectedMatch?.pair1Source ?? 'Chờ đội')
         }
         team2Label={
-          selectedMatch
+          selectedMatch?.pair2Id
             ? getPairLabel(
                 event.pairs.find((p) => p.id === selectedMatch.pair2Id)!,
                 event.participants,
               )
-            : ''
+            : selectedMatch?.pair2Source?.startsWith('W:') ||
+                selectedMatch?.pair2Source?.startsWith('L:')
+              ? 'Chờ đội'
+              : (selectedMatch?.pair2Source ?? 'Chờ đội')
         }
         onClose={() => setSelectedMatch(null)}
         onSubmit={(s1, s2) => {

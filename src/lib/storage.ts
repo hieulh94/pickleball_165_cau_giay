@@ -71,9 +71,13 @@ function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
 }
 
 function migrateMatch(match: Match): Match {
-  if (match.phase !== 'showmatch') return match
-  let migrated: Match = match
-  if (match.showmatchFormat !== 'best_of_3') {
+  let migrated: Match = {
+    ...match,
+    pair1Id: match.pair1Id ?? null,
+    pair2Id: match.pair2Id ?? null,
+  }
+  if (migrated.phase !== 'showmatch') return migrated
+  if (migrated.showmatchFormat !== 'best_of_3') {
     migrated = { ...migrated, showmatchFormat: 'best_of_3' }
   }
   if (migrated.participantContributions) {

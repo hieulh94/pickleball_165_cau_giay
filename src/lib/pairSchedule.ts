@@ -29,7 +29,7 @@ export function getPairScheduleEntries(
     .filter((match) => match.pair1Id === pairId || match.pair2Id === pairId)
     .map((match) => {
       const isPair1 = match.pair1Id === pairId
-      const opponentPairId = isPair1 ? match.pair2Id : match.pair1Id
+      const opponentPairId = (isPair1 ? match.pair2Id : match.pair1Id) as string
       const opponentPair = pairById.get(opponentPairId)
       const opponentPairNumber = pairNumberById.get(opponentPairId) ?? 0
       const opponentLabel = opponentPair

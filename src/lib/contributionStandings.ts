@@ -61,8 +61,11 @@ export function buildPlayerContributionStats(
       if (source === 'showmatch' && !isShowMatch(match)) continue
       if (source === 'tournament' && isShowMatch(match)) continue
 
-      const pair1 = pairById.get(match.pair1Id)
-      const pair2 = pairById.get(match.pair2Id)
+      const pair1Id = match.pair1Id
+      const pair2Id = match.pair2Id
+      if (!pair1Id || !pair2Id) continue
+      const pair1 = pairById.get(pair1Id)
+      const pair2 = pairById.get(pair2Id)
       if (!pair1 || !pair2) continue
 
       const team1 = [pair1.player1Id, pair1.player2Id]

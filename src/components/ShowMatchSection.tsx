@@ -80,8 +80,8 @@ function ShowMatchCard({
   const editable = canEditShowmatchInfo(match)
   const pair1 = pairs.find((p) => p.id === match.pair1Id)
   const pair2 = pairs.find((p) => p.id === match.pair2Id)
-  const pair1Number = pairNumberById.get(match.pair1Id) ?? 0
-  const pair2Number = pairNumberById.get(match.pair2Id) ?? 0
+  const pair1Number = match.pair1Id ? (pairNumberById.get(match.pair1Id) ?? 0) : 0
+  const pair2Number = match.pair2Id ? (pairNumberById.get(match.pair2Id) ?? 0) : 0
   const gamesWon = getShowmatchGamesWon(match)
   const gameDetail =
     match.games && match.games.length > 0 ? formatGameScoresDetail(match.games) : null

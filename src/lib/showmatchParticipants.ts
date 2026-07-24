@@ -82,12 +82,12 @@ export function getPairPlayerNames(
 
 export function pruneOrphanShowmatchPairs(
   pairs: Pair[],
-  matches: { pair1Id: string; pair2Id: string }[],
+  matches: { pair1Id: string | null; pair2Id: string | null }[],
 ): Pair[] {
   const usedPairIds = new Set<string>()
   for (const match of matches) {
-    usedPairIds.add(match.pair1Id)
-    usedPairIds.add(match.pair2Id)
+    if (match.pair1Id) usedPairIds.add(match.pair1Id)
+    if (match.pair2Id) usedPairIds.add(match.pair2Id)
   }
   return pairs.filter((pair) => usedPairIds.has(pair.id))
 }

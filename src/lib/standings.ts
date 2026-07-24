@@ -67,6 +67,7 @@ function buildStats(pairs: Pair[], matches: Match[]): Map<string, Omit<PairStand
     if (!match.completed || match.score1 === undefined || match.score2 === undefined) {
       continue
     }
+    if (!match.pair1Id || !match.pair2Id) continue
 
     const entries: [string, number, number][] = [
       [match.pair1Id, match.score1, match.score2],
@@ -119,6 +120,24 @@ export function calculateStandings(
 
 export function hasCompletedMatches(matches: Match[]): boolean {
   return matches.some((m) => isGroupMatch(m) && m.completed)
+}
+
+/**
+ * Đội hạng `rank` trong bảng (1-based), ổn định khi hòa:
+ * wins → pointDiff → pointsFor → pairId.
+ */
+export function getPairIdAtRank(
+  groupStandings: GroupStandings,
+  rank: number,
+): string | null {
+  const ordered = [...groupStandings.standings].sort((a, b) => {
+    if (a.rank !== b.rank) return a.rank - b.rank
+    if (b.wins !== a.wins) return b.wins - a.wins
+    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff
+    if (b.pointsFor !== a.pointsFor) return b.pointsFor - a.pointsFor
+    return a.pairId.localeCompare(b.pairId)
+  })
+  return ordered[rank - 1]?.pairId ?? null
 }
 
 export interface PairStandingInfo {

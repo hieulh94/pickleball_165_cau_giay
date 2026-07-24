@@ -22,15 +22,28 @@ export type MatchPhase = 'group' | 'playoff' | 'showmatch'
 
 export type ShowmatchFormat = 'best_of_3'
 
+export type PlayoffBracketKind = 'championship' | 'placement'
+
+export type PlayoffConfigStatus = 'configured' | 'generated'
+
 export interface ShowmatchGame {
   score1: number
   score2: number
 }
 
+export interface PlayoffConfig {
+  /** Số hạng đầu mỗi bảng vào nhánh tranh giải */
+  championshipSlotsPerGroup: number
+  /** Số hạng còn lại mỗi bảng vào nhánh tranh thứ hạng */
+  placementSlotsPerGroup: number
+  status?: PlayoffConfigStatus
+}
+
 export interface Match {
   id: string
-  pair1Id: string
-  pair2Id: string
+  /** null = chờ đội (TBD) — chỉ playoff bracket tự động */
+  pair1Id: string | null
+  pair2Id: string | null
   round: number
   court: number
   group?: string
@@ -50,6 +63,18 @@ export interface Match {
   completed: boolean
   /** Beer cống hiến từng người trong trận (participantId → amount) — showmatch */
   participantContributions?: Record<string, number>
+  /** Nhánh playoff tự động */
+  playoffBracket?: PlayoffBracketKind
+  /** Thứ tự vòng trong bracket (1 = vòng đầu) */
+  playoffRound?: number
+  /** Slot seed hiển thị: "A1", "B2", "W:…", "L:…" */
+  pair1Source?: string
+  pair2Source?: string
+  /** Khi xong: điền winner/loser vào trận đích */
+  winnerToMatchId?: string
+  winnerToSlot?: 1 | 2
+  loserToMatchId?: string
+  loserToSlot?: 1 | 2
 }
 
 export type EventType = 'tournament' | 'showmatch'
@@ -77,6 +102,8 @@ export interface PickleballEvent {
   scheduleLocked?: boolean
   courts: number[]
   matches: Match[]
+  /** Cấu hình tự tạo bracket playoff từ BXH */
+  playoffConfig?: PlayoffConfig
   /** Số beer cống hiến từng người (participantId → amount) — mini game, dùng cho BXH */
   participantContributions?: Record<string, number>
 }
