@@ -467,11 +467,15 @@ export function PlayoffSection({
       {placementMatches.length > 0 && (
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-neutral-800">Nhánh tranh hạng</h4>
-          {groupCount >= 3 && (
+          {groupCount === 2 ? (
+            <p className="text-xs text-neutral-500">
+              Cùng hạng mỗi bảng gặp nhau quyết định luôn: A3–B3 tranh 5–6, A4–B4 tranh 7–8…
+            </p>
+          ) : groupCount >= 3 ? (
             <p className="text-xs text-neutral-500">
               Từ 3 bảng trở lên: mỗi cùng hạng tạo mini nhánh riêng.
             </p>
-          )}
+          ) : null}
           {groupByRound(placementMatches).map(([round, roundMatches]) => (
             <div key={`p-${round}`}>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">

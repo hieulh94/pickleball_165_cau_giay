@@ -9,6 +9,10 @@ import {
 } from 'firebase/firestore'
 import type { Match, PickleballEvent } from '../types'
 import { getDb } from './firebase'
+import {
+  migrateLegacyTwoGroupPlacementMatches,
+  needsLegacyTwoGroupPlacementMigration,
+} from './playoffBracket'
 
 const EVENTS_COLLECTION = 'events'
 
@@ -64,7 +68,9 @@ function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
   }
 
   if (Array.isArray(event.matches)) {
-    event.matches = event.matches.map((match) => migrateMatch(match))
+    event.matches = migrateLegacyTwoGroupPlacementMatches(
+      event.matches.map((match) => migrateMatch(match)),
+    )
   }
 
   return event
@@ -138,7 +144,14 @@ export function subscribeEvent(
         onData(null)
         return
       }
-      onData(docToEvent(snapshot.id, snapshot.data() as Record<string, unknown>))
+      const raw = snapshot.data() as Record<string, unknown>
+      const event = docToEvent(snapshot.id, raw)
+      onData(event)
+
+      // Một lần: A3 vs B3… → Tranh hạng 5-6… (giữ điểm), xóa trận W/L thừa
+      if (needsLegacyTwoGroupPlacementMigration(raw.matches as Match[] | undefined)) {
+        void upsertEvent(event)
+      }
     },
     (error) => onError?.(error),
   )

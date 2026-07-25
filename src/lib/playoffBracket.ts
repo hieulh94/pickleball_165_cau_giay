@@ -359,6 +359,10 @@ function bracketSeedOrder(size: number): number[] {
   return result
 }
 
+/**
+ * 2 bảng: mỗi cùng hạng quyết định luôn 2 chỗ liền kề.
+ * Ví dụ a=2: A3–B3 → tranh 5–6, A4–B4 → tranh 7–8, …
+ */
 function buildPlacementTwoGroups(
   standings: GroupStandings[],
   a: number,
@@ -373,13 +377,14 @@ function buildPlacementTwoGroups(
 
   const [gA, gB] = groups
   const matches: Match[] = []
+  const basePlace = 2 * a + 1
 
-  if (b === 1) {
-    const rank = a + 1
+  for (let i = 0; i < b; i++) {
+    const rank = a + 1 + i
     const p1 = getPairIdAtRank(gA, rank)
     const p2 = getPairIdAtRank(gB, rank)
-    if (!p1 || !p2) return []
-    const placeLow = 2 * a + 1
+    if (!p1 || !p2 || !gA.group || !gB.group) continue
+    const placeLow = basePlace + i * 2
     matches.push({
       id: createId(),
       pair1Id: p1,
@@ -391,135 +396,11 @@ function buildPlacementTwoGroups(
       completed: false,
       playoffBracket: 'placement',
       playoffRound: 1,
-      pair1Source: seedKey(gA.group!, rank),
-      pair2Source: seedKey(gB.group!, rank),
-    })
-    return matches
-  }
-
-  // Round 1: Ar vs Br for r = a+1 .. a+b
-  const r1: Match[] = []
-  for (let i = 0; i < b; i++) {
-    const rank = a + 1 + i
-    const p1 = getPairIdAtRank(gA, rank)
-    const p2 = getPairIdAtRank(gB, rank)
-    if (!p1 || !p2) continue
-    const m: Match = {
-      id: createId(),
-      pair1Id: p1,
-      pair2Id: p2,
-      round: 0,
-      court: courtAt(courts, courtOffset.value++),
-      phase: 'playoff',
-      name: `${seedKey(gA.group!, rank)} vs ${seedKey(gB.group!, rank)}`,
-      completed: false,
-      playoffBracket: 'placement',
-      playoffRound: 1,
-      pair1Source: seedKey(gA.group!, rank),
-      pair2Source: seedKey(gB.group!, rank),
-    }
-    r1.push(m)
-    matches.push(m)
-  }
-
-  if (r1.length < 2) return matches
-
-  const basePlace = 2 * a + 1
-
-  if (b === 2) {
-    // W vs W → higher, L vs L → lower
-    const wwId = createId()
-    const llId = createId()
-    const ww: Match = {
-      id: wwId,
-      pair1Id: null,
-      pair2Id: null,
-      round: 0,
-      court: courtAt(courts, courtOffset.value++),
-      phase: 'playoff',
-      name: `Tranh hạng ${basePlace}-${basePlace + 1}`,
-      completed: false,
-      playoffBracket: 'placement',
-      playoffRound: 2,
-      pair1Source: `W:${r1[0].id}`,
-      pair2Source: `W:${r1[1].id}`,
-    }
-    const ll: Match = {
-      id: llId,
-      pair1Id: null,
-      pair2Id: null,
-      round: 0,
-      court: courtAt(courts, courtOffset.value++),
-      phase: 'playoff',
-      name: `Tranh hạng ${basePlace + 2}-${basePlace + 3}`,
-      completed: false,
-      playoffBracket: 'placement',
-      playoffRound: 2,
-      pair1Source: `L:${r1[0].id}`,
-      pair2Source: `L:${r1[1].id}`,
-    }
-    r1[0].winnerToMatchId = wwId
-    r1[0].winnerToSlot = 1
-    r1[0].loserToMatchId = llId
-    r1[0].loserToSlot = 1
-    r1[1].winnerToMatchId = wwId
-    r1[1].winnerToSlot = 2
-    r1[1].loserToMatchId = llId
-    r1[1].loserToSlot = 2
-    matches.push(ww, ll)
-    return matches
-  }
-
-  // b >= 3: PM0 = W0 vs W1; PMi = L(i-1) vs W(i+1); PM(b-1) = L(b-2) vs L(b-1)
-  const placeMatches: Match[] = []
-  for (let i = 0; i < b; i++) {
-    const placeLow = basePlace + i * 2
-    const id = createId()
-    placeMatches.push({
-      id,
-      pair1Id: null,
-      pair2Id: null,
-      round: 0,
-      court: courtAt(courts, courtOffset.value++),
-      phase: 'playoff',
-      name: `Tranh hạng ${placeLow}-${placeLow + 1}`,
-      completed: false,
-      playoffBracket: 'placement',
-      playoffRound: 2,
-      pair1Source: undefined,
-      pair2Source: undefined,
+      pair1Source: seedKey(gA.group, rank),
+      pair2Source: seedKey(gB.group, rank),
     })
   }
 
-  // Wire R1 → place matches
-  // PM0: W0 vs W1
-  placeMatches[0].pair1Source = `W:${r1[0].id}`
-  placeMatches[0].pair2Source = `W:${r1[1].id}`
-  r1[0].winnerToMatchId = placeMatches[0].id
-  r1[0].winnerToSlot = 1
-  r1[1].winnerToMatchId = placeMatches[0].id
-  r1[1].winnerToSlot = 2
-
-  for (let i = 1; i <= b - 2; i++) {
-    // PMi: L(i-1) vs W(i+1)
-    placeMatches[i].pair1Source = `L:${r1[i - 1].id}`
-    placeMatches[i].pair2Source = `W:${r1[i + 1].id}`
-    r1[i - 1].loserToMatchId = placeMatches[i].id
-    r1[i - 1].loserToSlot = 1
-    r1[i + 1].winnerToMatchId = placeMatches[i].id
-    r1[i + 1].winnerToSlot = 2
-  }
-
-  // Last: L(b-2) vs L(b-1)
-  const last = b - 1
-  placeMatches[last].pair1Source = `L:${r1[b - 2].id}`
-  placeMatches[last].pair2Source = `L:${r1[b - 1].id}`
-  r1[b - 2].loserToMatchId = placeMatches[last].id
-  r1[b - 2].loserToSlot = 1
-  r1[b - 1].loserToMatchId = placeMatches[last].id
-  r1[b - 1].loserToSlot = 2
-
-  matches.push(...placeMatches)
   return matches
 }
 
@@ -703,6 +584,60 @@ function buildPlacementNGroups(
   return matches
 }
 
+const LEGACY_SAME_RANK_PLACEMENT_NAME = /^([A-Z])(\d+)\s+vs\s+([A-Z])(\d+)$/i
+
+/** Bracket cũ: R1 tên "A3 vs B3" rồi W/L → tranh hạng. */
+export function needsLegacyTwoGroupPlacementMigration(matches: Match[] | undefined): boolean {
+  if (!Array.isArray(matches)) return false
+  return matches.some(
+    (m) =>
+      m.playoffBracket === 'placement' &&
+      typeof m.name === 'string' &&
+      LEGACY_SAME_RANK_PLACEMENT_NAME.test(m.name),
+  )
+}
+
+/**
+ * Giữ điểm trận cùng hạng (A3–B3…), đổi thành "Tranh hạng X-Y",
+ * xóa trận funnel W/L phía sau.
+ */
+export function migrateLegacyTwoGroupPlacementMatches(matches: Match[]): Match[] {
+  if (!needsLegacyTwoGroupPlacementMigration(matches)) return matches
+
+  const toRemove = new Set<string>()
+  const renamed = matches.map((m) => {
+    if (m.playoffBracket !== 'placement' || typeof m.name !== 'string') return m
+    const parsed = m.name.match(LEGACY_SAME_RANK_PLACEMENT_NAME)
+    if (!parsed) return m
+    const rank1 = parseInt(parsed[2], 10)
+    const rank2 = parseInt(parsed[4], 10)
+    if (!Number.isFinite(rank1) || rank1 !== rank2) return m
+
+    if (m.winnerToMatchId) toRemove.add(m.winnerToMatchId)
+    if (m.loserToMatchId) toRemove.add(m.loserToMatchId)
+
+    const placeLow = 2 * rank1 - 1
+    return {
+      id: m.id,
+      pair1Id: m.pair1Id,
+      pair2Id: m.pair2Id,
+      round: m.round,
+      court: m.court,
+      phase: m.phase,
+      name: `Tranh hạng ${placeLow}-${placeLow + 1}`,
+      score1: m.score1,
+      score2: m.score2,
+      completed: m.completed,
+      playoffBracket: m.playoffBracket,
+      playoffRound: 1,
+      pair1Source: m.pair1Source,
+      pair2Source: m.pair2Source,
+    } satisfies Match
+  })
+
+  return renamed.filter((m) => !toRemove.has(m.id))
+}
+
 export function buildPlayoffMatches(
   standings: GroupStandings[],
   config: PlayoffConfig,
@@ -876,9 +811,10 @@ export function describePlayoffPreview(
   if (groupCount >= 2 && a >= 2) {
     parts.push('Vòng 1 tranh giải: A1–B2, B1–C2, C1–A2… (xoay vòng)')
   }
-  if (groupCount === 2 && b >= 3) {
+  if (groupCount === 2 && b > 0) {
     parts.push(
-      `Tranh hạng: A${a + 1}–B${a + 1}… rồi W/L → hạng ${2 * a + 1}…`,
+      `Tranh hạng: A${a + 1}–B${a + 1} → ${2 * a + 1}–${2 * a + 2}` +
+        (b > 1 ? `, A${a + 2}–B${a + 2} → ${2 * a + 3}–${2 * a + 4}…` : ''),
     )
   } else if (groupCount >= 3 && b > 0) {
     parts.push('Tranh hạng: mini nhánh theo cùng hạng mỗi bảng')
