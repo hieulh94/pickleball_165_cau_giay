@@ -41,6 +41,7 @@ export function ContributionLeaderboardPanel() {
         setEvents(data)
         setLoading(false)
         try {
+          // Chỉ tính lại local cho BXH; Elo Thành viên lấy từ Firestore khi mở tab đó.
           recomputeClubRatingsFromEvents(data)
         } catch (err) {
           console.error(err)

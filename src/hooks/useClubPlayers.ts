@@ -7,6 +7,7 @@ import {
   type ClubPlayer,
   type ClubPlayerGender,
 } from '../lib/clubPlayers'
+import { saveClubPlayerToFirestore } from '../lib/clubPlayersFirestore'
 import { syncClubPlayerRenameInEvents } from '../lib/clubPlayerSync'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
@@ -25,6 +26,9 @@ export function useClubPlayers() {
     const result = addClubPlayer(name, gender)
     if ('error' in result) return result.error
     setPlayers(getClubPlayers())
+    if (isFirebaseConfigured()) {
+      void saveClubPlayerToFirestore(result.player).catch((err) => console.error(err))
+    }
     return null
   }
 
@@ -46,6 +50,15 @@ export function useClubPlayers() {
       } catch (err) {
         console.error(err)
         return 'Đã lưu tên trên thiết bị nhưng không đồng bộ được lên event. Kiểm tra mạng và thử lại.'
+      }
+    }
+
+    if (isFirebaseConfigured()) {
+      try {
+        await saveClubPlayerToFirestore(result.player)
+      } catch (err) {
+        console.error(err)
+        return 'Đã lưu trên thiết bị nhưng chưa ghi được Firestore. Kiểm tra mạng / rules.'
       }
     }
 

@@ -434,6 +434,17 @@ function writeStoredPlayers(players: ClubPlayer[]) {
   notifyClubPlayersChanged()
 }
 
+/**
+ * Ghi đè danh sách local từ Firestore (nguồn Elo / A–B dùng chung).
+ * Vẫn chạy migrate merge tên để gộp alias nếu còn sót.
+ */
+export function replaceClubPlayersFromRemote(players: ClubPlayer[]): void {
+  const normalized = players.map(normalizeClubPlayer).filter((p) => p.name.length > 0)
+  const { players: merged } = applyKnownNameMerges(normalized)
+  const { players: withFemales } = applyKnownFemaleGenders(merged)
+  writeStoredPlayers(withFemales)
+}
+
 export function buildClubPlayerId(name: string): string {
   const base = normalizeParticipantName(name).replace(/\s+/g, '-')
   return base || crypto.randomUUID()

@@ -7,5 +7,10 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read, write: if true;
     }
+
+    // Thành viên CLB + Elo / trình độ A–B (đồng bộ mọi thiết bị).
+    match /clubPlayers/{playerId} {
+      allow read, write: if true;
+    }
   }
 }

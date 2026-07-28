@@ -13,6 +13,7 @@ import {
   DEFAULT_CLUB_PLAYER_GENDER,
   DEFAULT_CLUB_PLAYER_RATING,
   DEFAULT_CLUB_PLAYER_SKILL_LEVEL,
+  getClubPlayers,
   getPlayerAvatarColor,
   getPlayerInitials,
   type ClubPlayer,
@@ -39,6 +40,7 @@ import {
 } from '../lib/playerRating'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
 import { subscribeEvents } from '../lib/storage'
+import { saveClubPlayersToFirestore, subscribeClubPlayers } from '../lib/clubPlayersFirestore'
 import type { PickleballEvent, SkillLevel } from '../types'
 
 type GenderFilter = 'all' | ClubPlayerGender
@@ -195,25 +197,22 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
+    return subscribeClubPlayers(
+      () => setEloHydrated(true),
+      () => setEloHydrated(true),
+    )
+  }, [])
+
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return
     return subscribeEvents(
       (data) => {
         setEvents(data)
         setEventsReady(true)
         eloCacheRef.current.clear()
         setRankChangesReady(false)
-        try {
-          // Máy/trình duyệt mới: tự tính Elo từ event, không để kẹt seed B=900.
-          recomputeClubRatingsFromEvents(data)
-        } catch (err) {
-          console.error(err)
-        } finally {
-          setEloHydrated(true)
-        }
       },
-      () => {
-        setEventsReady(true)
-        setEloHydrated(true)
-      },
+      () => setEventsReady(true),
     )
   }, [])
 
@@ -342,16 +341,17 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
     setSyncMessage(null)
     try {
       const { updated, rows } = recomputeClubRatingsFromEvents(events)
+      await saveClubPlayersToFirestore(getClubPlayers())
       setSyncMessage(
         updated > 0
-          ? `Đã cập nhật ${updated} thành viên từ ${rows.filter((r) => r.matchesRated > 0).length} người có trận mini game.`
+          ? `Đã đồng bộ Elo + lưu Firestore (${updated} thành viên · ${rows.filter((r) => r.matchesRated > 0).length} người có trận).`
           : rows.some((r) => r.matchesRated > 0)
-            ? 'Điểm đã đồng bộ — không có thay đổi mới.'
-            : 'Chưa có trận mini game hoàn thành để tính điểm.',
+            ? 'Đã lưu Firestore — Elo không đổi.'
+            : 'Chưa có trận mini game hoàn thành để tính điểm. Đã lưu A/B hiện tại lên Firestore.',
       )
     } catch (err) {
       console.error(err)
-      setSyncMessage('Không đồng bộ được. Kiểm tra mạng và thử lại.')
+      setSyncMessage('Không đồng bộ được. Kiểm tra mạng / rules Firestore và thử lại.')
     } finally {
       setSyncing(false)
     }
@@ -453,16 +453,17 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
             disabled={syncing}
             className="shrink-0"
           >
-            {syncing ? 'Đang đồng bộ…' : 'Đồng bộ điểm từ event'}
+            {syncing ? 'Đang đồng bộ…' : 'Đồng bộ Elo → Firestore'}
           </Button>
         )}
       </div>
 
       <p className="rounded-xl border border-primary-100 bg-primary-50/70 px-3.5 py-2.5 text-sm leading-relaxed text-primary-900/80">
-        <span className="font-semibold text-primary-900">Cách tính Elo:</span> cộng/trừ sau mỗi trận
-        mini game (không tính showmatch) — thắng đối thủ mạnh được nhiều điểm hơn. Ban đầu A ≈ 1100,
-        B ≈ 900. Đủ {ELO_MIN_MATCHES_FOR_SKILL_CHANGE} trận: Elo ≥ {ELO_PROMOTE_THRESHOLD} lên A, ≤{' '}
-        {ELO_DEMOTE_THRESHOLD} xuống B.
+        <span className="font-semibold text-primary-900">Cách tính Elo:</span> chỉnh hạng A/B trên
+        từng người → bấm <span className="font-semibold">Đồng bộ Elo → Firestore</span> (tính lại từ
+        mini game theo seed A≈1100 / B≈900, rồi lưu chung). Máy khác mở Thành viên sẽ tải bản mới
+        nhất. Đủ {ELO_MIN_MATCHES_FOR_SKILL_CHANGE} trận: Elo ≥ {ELO_PROMOTE_THRESHOLD} lên A, ≤{' '}
+        {ELO_DEMOTE_THRESHOLD} xuống B. Không tính showmatch.
       </p>
 
       {syncMessage && (
@@ -474,7 +475,7 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
             className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600"
             aria-hidden
           />
-          Đang đồng bộ Elo từ lịch sử mini game…
+          Đang tải Elo / hạng từ Firestore…
         </p>
       )}
 
