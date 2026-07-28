@@ -61,6 +61,19 @@ export function formatSkillChangeLabel(from: SkillLevel, to: SkillLevel): string
   return `${from} → ${to}`
 }
 
+export interface SkillChangeEvent {
+  playerName: string
+  clubPlayerId?: string
+  from: SkillLevel
+  to: SkillLevel
+  ratingAfter: number
+  eventId: string
+  eventName: string
+  eventDate: string
+  matchId: string
+  round: number
+}
+
 interface RatingState {
   clubPlayerId?: string
   displayName: string
@@ -168,9 +181,14 @@ function peekSkillAfter(state: RatingState, delta: number): SkillLevel {
 function replayRatings(
   events: PickleballEvent[],
   collectForKey?: string,
-): { states: Map<string, RatingState>; history: EloHistoryEntry[] } {
+): {
+  states: Map<string, RatingState>
+  history: EloHistoryEntry[]
+  skillChanges: SkillChangeEvent[]
+} {
   const states = new Map<string, RatingState>()
   const history: EloHistoryEntry[] = []
+  const skillChanges: SkillChangeEvent[] = []
 
   const tournamentEvents = events
     .filter(isTournamentEvent)
@@ -269,24 +287,37 @@ function replayRatings(
         recordTeam(team2Players, team2States, !team1Won, delta2, team1Players)
       }
 
-      for (const state of team1States) {
-        state.rating += delta1
-        state.matchesRated += 1
-        if (team1Won) state.wins += 1
-        else state.losses += 1
-        state.skillLevel = applySkillFromRating(state)
+      const applyTeam = (teamStates: RatingState[], delta: number, won: boolean) => {
+        for (const state of teamStates) {
+          const skillBefore = state.skillLevel
+          state.rating += delta
+          state.matchesRated += 1
+          if (won) state.wins += 1
+          else state.losses += 1
+          state.skillLevel = applySkillFromRating(state)
+          if (skillBefore !== state.skillLevel) {
+            skillChanges.push({
+              playerName: state.displayName,
+              clubPlayerId: state.clubPlayerId,
+              from: skillBefore,
+              to: state.skillLevel,
+              ratingAfter: Math.round(state.rating),
+              eventId: event.id,
+              eventName: event.name,
+              eventDate: event.createdAt,
+              matchId: match.id,
+              round: match.round,
+            })
+          }
+        }
       }
-      for (const state of team2States) {
-        state.rating += delta2
-        state.matchesRated += 1
-        if (!team1Won) state.wins += 1
-        else state.losses += 1
-        state.skillLevel = applySkillFromRating(state)
-      }
+
+      applyTeam(team1States, delta1, team1Won)
+      applyTeam(team2States, delta2, !team1Won)
     }
   }
 
-  return { states, history }
+  return { states, history, skillChanges }
 }
 
 function resolveHistoryPlayerKey(playerName: string): string {
@@ -334,6 +365,26 @@ export function getPlayerEloHistory(
       ratingBefore: Math.round(entry.ratingBefore),
       ratingAfter: Math.round(entry.ratingAfter),
     }))
+}
+
+/** Mọi lần đổi hạng A↔B (mới nhất trước). */
+export function getSkillRankChanges(events: PickleballEvent[]): SkillChangeEvent[] {
+  const { skillChanges } = replayRatings(events)
+  return skillChanges
+    .filter(
+      (change) =>
+        (change.from === 'B' && change.to === 'A') ||
+        (change.from === 'A' && change.to === 'B'),
+    )
+    .slice()
+    .reverse()
+}
+
+/** @deprecated Dùng getSkillRankChanges — giữ alias thăng hạng B→A. */
+export function getSkillPromotions(events: PickleballEvent[]): SkillChangeEvent[] {
+  return getSkillRankChanges(events).filter(
+    (change) => change.from === 'B' && change.to === 'A',
+  )
 }
 
 /** Tính lại Elo + cập nhật skillLevel club (cùng giới). Trả về số thành viên đổi. */

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EloHistoryDialog } from './EloHistoryDialog'
 import { MemberEditDialog, MemberGenderBadge } from './MemberEditDialog'
@@ -29,15 +30,19 @@ import {
   ELO_DEMOTE_THRESHOLD,
   ELO_MIN_MATCHES_FOR_SKILL_CHANGE,
   ELO_PROMOTE_THRESHOLD,
+  formatSkillChangeLabel,
   getPlayerEloHistory,
+  getSkillRankChanges,
   recomputeClubRatingsFromEvents,
   type EloHistoryEntry,
+  type SkillChangeEvent,
 } from '../lib/playerRating'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
 import { subscribeEvents } from '../lib/storage'
 import type { PickleballEvent, SkillLevel } from '../types'
 
 type GenderFilter = 'all' | ClubPlayerGender
+type MembersListTab = 'members' | 'promotions'
 
 const GENDER_FILTER_OPTIONS: { value: GenderFilter; label: string }[] = [
   { value: 'all', label: 'Tất cả' },
@@ -129,6 +134,10 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   const [eloLoading, setEloLoading] = useState(false)
   const [events, setEvents] = useState<PickleballEvent[]>([])
   const [eventsReady, setEventsReady] = useState(!isFirebaseConfigured())
+  const [listTab, setListTab] = useState<MembersListTab>('members')
+  const [rankChanges, setRankChanges] = useState<SkillChangeEvent[]>([])
+  const [rankChangesLoading, setRankChangesLoading] = useState(false)
+  const [rankChangesReady, setRankChangesReady] = useState(false)
   const eloCacheRef = useRef(new Map<string, EloHistoryEntry[]>())
   const eloRequestIdRef = useRef(0)
 
@@ -139,10 +148,36 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
         setEvents(data)
         setEventsReady(true)
         eloCacheRef.current.clear()
+        setRankChangesReady(false)
       },
       () => setEventsReady(true),
     )
   }, [])
+
+  useEffect(() => {
+    if (listTab !== 'promotions') return
+    if (!isFirebaseConfigured()) {
+      setRankChanges([])
+      setRankChangesReady(true)
+      setRankChangesLoading(false)
+      return
+    }
+    if (rankChangesReady) return
+    if (!eventsReady) {
+      setRankChangesLoading(true)
+      return
+    }
+
+    setRankChangesLoading(true)
+    const eventList = events
+    requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        setRankChanges(getSkillRankChanges(eventList))
+        setRankChangesReady(true)
+        setRankChangesLoading(false)
+      }, 0)
+    })
+  }, [listTab, rankChangesReady, eventsReady, events])
 
   const filteredPlayers = useMemo(() => {
     const normalized = normalizeParticipantName(search)
@@ -254,6 +289,25 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
     })
   }
 
+  const openEloForPromotion = (change: SkillChangeEvent) => {
+    const player =
+      players.find((p) => p.id === change.clubPlayerId) ??
+      players.find(
+        (p) => normalizeParticipantName(p.name) === normalizeParticipantName(change.playerName),
+      )
+    if (player) {
+      handleOpenEloHistory(player)
+      return
+    }
+    handleOpenEloHistory({
+      id: change.clubPlayerId ?? change.playerName,
+      name: change.playerName,
+      skillLevel: change.to,
+      rating: change.ratingAfter,
+      matchesRated: 0,
+    })
+  }
+
   // Mở Elo trước khi snapshot Firebase về → điền khi sẵn sàng.
   useEffect(() => {
     if (!eloTarget || !eloLoading || !eventsReady || !isFirebaseConfigured()) return
@@ -304,137 +358,257 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
         <p className="text-sm text-neutral-600">{syncMessage}</p>
       )}
 
-      {canEdit && (
-        <>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => {
-                setNewName(e.target.value)
-                if (error) setError(null)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAdd()
-              }}
-              placeholder="Tên thành viên mới..."
-              className="h-10 flex-1 rounded-lg border border-neutral-200 px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
-            />
-            <select
-              value={newGender}
-              onChange={(e) => setNewGender(e.target.value as ClubPlayerGender)}
-              className={`h-10 shrink-0 ${selectClassName}`}
-              aria-label="Giới tính"
-            >
-              <option value="male">Nam</option>
-              <option value="female">Nữ</option>
-              <option value="other">Khác</option>
-            </select>
-            <Button onClick={handleAdd} className="shrink-0 sm:w-auto">
-              + Thêm
-            </Button>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </>
-      )}
-
-      <SearchInput value={search} onChange={setSearch} placeholder="Tìm thành viên..." />
-
-      <div className="flex flex-wrap gap-2">
-        {GENDER_FILTER_OPTIONS.map((option) => (
+      <div className="flex gap-1 rounded-xl border border-border bg-neutral-50 p-1">
+        {(
+          [
+            { id: 'members' as const, label: 'Danh sách' },
+            { id: 'promotions' as const, label: 'Đổi hạng' },
+          ] as const
+        ).map((tab) => (
           <button
-            key={option.value}
+            key={tab.id}
             type="button"
-            onClick={() => setGenderFilter(option.value)}
+            onClick={() => setListTab(tab.id)}
             className={cn(
-              'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-              genderFilter === option.value
-                ? option.value === 'male'
-                  ? 'border-sky-400 bg-sky-100 text-sky-800'
-                  : option.value === 'female'
-                    ? 'border-rose-400 bg-rose-100 text-rose-800'
-                    : option.value === 'other'
-                      ? 'border-neutral-400 bg-neutral-100 text-neutral-700'
-                      : 'border-primary-500 bg-primary-100 text-primary-800'
-                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50',
+              'flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition',
+              listTab === tab.id
+                ? 'bg-white text-primary-800 shadow-sm'
+                : 'text-neutral-600 hover:text-neutral-900',
             )}
           >
-            {option.label}
+            {tab.label}
+            {tab.id === 'promotions' && rankChangesReady && rankChanges.length > 0
+              ? ` (${rankChanges.length})`
+              : ''}
           </button>
         ))}
       </div>
 
-      {filteredPlayers.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-10 text-center">
-          <p className="text-sm text-text-secondary">
-            {hasActiveFilter ? 'Không tìm thấy thành viên.' : 'Chưa có thành viên nào.'}
-          </p>
-        </div>
-      ) : (
-        <ul className="grid gap-2 sm:grid-cols-2 landscape-short:grid-cols-3 lg:grid-cols-3">
-          {filteredPlayers.map((player) => (
-            <li
-              key={player.id}
-              className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm"
-            >
-              <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${getPlayerAvatarColor(player.name)}`}
-                aria-hidden
-              >
-                {getPlayerInitials(player.name)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-text-primary">{player.name}</p>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <MemberGenderBadge gender={player.gender} />
-                  <SkillLevelBadge
-                    level={player.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL}
-                    gender={player.gender ?? DEFAULT_CLUB_PLAYER_GENDER}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEloHistory(player)}
-                    className="rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-700 transition hover:bg-primary-50"
-                    title="Xem chi tiết cộng trừ Elo"
-                  >
-                    {player.rating ?? DEFAULT_CLUB_PLAYER_RATING} Elo
-                    {(player.matchesRated ?? 0) > 0
-                      ? ` · ${player.matchesRated} trận`
-                      : ''}
-                  </button>
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEloHistory(player)}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
+      {listTab === 'members' ? (
+        <>
+          {canEdit && (
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => {
+                    setNewName(e.target.value)
+                    if (error) setError(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdd()
+                  }}
+                  placeholder="Tên thành viên mới..."
+                  className="h-10 flex-1 rounded-lg border border-neutral-200 px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+                />
+                <select
+                  value={newGender}
+                  onChange={(e) => setNewGender(e.target.value as ClubPlayerGender)}
+                  className={`h-10 shrink-0 ${selectClassName}`}
+                  aria-label="Giới tính"
                 >
-                  Elo
-                </button>
-                {canEdit && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setEditTarget(player)}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-50"
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget({ id: player.id, name: player.name })}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                      aria-label={`Xóa ${player.name}`}
-                    >
-                      Xóa
-                    </button>
-                  </>
-                )}
+                  <option value="male">Nam</option>
+                  <option value="female">Nữ</option>
+                  <option value="other">Khác</option>
+                </select>
+                <Button onClick={handleAdd} className="shrink-0 sm:w-auto">
+                  + Thêm
+                </Button>
               </div>
-            </li>
-          ))}
-        </ul>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+            </>
+          )}
+
+          <SearchInput value={search} onChange={setSearch} placeholder="Tìm thành viên..." />
+
+          <div className="flex flex-wrap gap-2">
+            {GENDER_FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setGenderFilter(option.value)}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                  genderFilter === option.value
+                    ? option.value === 'male'
+                      ? 'border-sky-400 bg-sky-100 text-sky-800'
+                      : option.value === 'female'
+                        ? 'border-rose-400 bg-rose-100 text-rose-800'
+                        : option.value === 'other'
+                          ? 'border-neutral-400 bg-neutral-100 text-neutral-700'
+                          : 'border-primary-500 bg-primary-100 text-primary-800'
+                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50',
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {filteredPlayers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-10 text-center">
+              <p className="text-sm text-text-secondary">
+                {hasActiveFilter ? 'Không tìm thấy thành viên.' : 'Chưa có thành viên nào.'}
+              </p>
+            </div>
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2 landscape-short:grid-cols-3 lg:grid-cols-3">
+              {filteredPlayers.map((player) => (
+                <li
+                  key={player.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm"
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${getPlayerAvatarColor(player.name)}`}
+                    aria-hidden
+                  >
+                    {getPlayerInitials(player.name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text-primary">{player.name}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <MemberGenderBadge gender={player.gender} />
+                      <SkillLevelBadge
+                        level={player.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL}
+                        gender={player.gender ?? DEFAULT_CLUB_PLAYER_GENDER}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEloHistory(player)}
+                        className="rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-700 transition hover:bg-primary-50"
+                        title="Xem chi tiết cộng trừ Elo"
+                      >
+                        {player.rating ?? DEFAULT_CLUB_PLAYER_RATING} Elo
+                        {(player.matchesRated ?? 0) > 0
+                          ? ` · ${player.matchesRated} trận`
+                          : ''}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEloHistory(player)}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
+                    >
+                      Elo
+                    </button>
+                    {canEdit && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setEditTarget(player)}
+                          className="rounded-lg px-2 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-50"
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget({ id: player.id, name: player.name })}
+                          className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                          aria-label={`Xóa ${player.name}`}
+                        >
+                          Xóa
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-text-secondary">
+            Lịch sử thăng hạng B → A (Elo ≥ {ELO_PROMOTE_THRESHOLD}) và xuống hạng A → B (Elo ≤{' '}
+            {ELO_DEMOTE_THRESHOLD}), sau đủ {ELO_MIN_MATCHES_FOR_SKILL_CHANGE} trận mini game.
+          </p>
+
+          {rankChangesLoading || (!rankChangesReady && !eventsReady) ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-4 py-10">
+              <span
+                className="h-8 w-8 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600"
+                aria-hidden
+              />
+              <p className="text-sm text-neutral-500">Đang tải lịch sử đổi hạng…</p>
+            </div>
+          ) : rankChanges.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-10 text-center">
+              <p className="text-sm text-text-secondary">Chưa có lần đổi hạng A ↔ B nào.</p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {rankChanges.map((change) => {
+                const promoted = change.from === 'B' && change.to === 'A'
+                return (
+                  <li
+                    key={`${change.matchId}-${change.eventId}-${change.playerName}-${change.from}-${change.to}`}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl border p-3',
+                      promoted
+                        ? 'border-amber-200 bg-amber-50/60'
+                        : 'border-sky-200 bg-sky-50/60',
+                    )}
+                  >
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${getPlayerAvatarColor(change.playerName)}`}
+                      aria-hidden
+                    >
+                      {getPlayerInitials(change.playerName)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-text-primary">
+                        {change.playerName}
+                      </p>
+                      <p
+                        className={cn(
+                          'mt-0.5 text-xs font-medium',
+                          promoted ? 'text-amber-800' : 'text-sky-800',
+                        )}
+                      >
+                        {formatSkillChangeLabel(change.from, change.to)} · {change.ratingAfter} Elo
+                      </p>
+                      <Link
+                        to={`/event/${change.eventId}`}
+                        className="mt-0.5 block truncate text-xs font-medium text-primary-600 hover:underline"
+                      >
+                        {change.eventName}
+                      </Link>
+                      <p className="mt-0.5 text-[11px] tabular-nums text-neutral-500">
+                        {new Date(change.eventDate).toLocaleDateString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })}
+                        {' · '}
+                        Vòng {change.round}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold',
+                        promoted
+                          ? 'bg-amber-200/80 text-amber-900'
+                          : 'bg-sky-200/80 text-sky-900',
+                      )}
+                    >
+                      {change.from}→{change.to}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openEloForPromotion(change)}
+                      className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-white/80"
+                    >
+                      Elo
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       {canEdit && (
