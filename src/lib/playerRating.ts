@@ -113,13 +113,18 @@ function resolvePlayerIdentity(participant: Participant): {
     ? `id:${clubPlayerId}`
     : `name:${normalizeParticipantName(canonicalName)}`
 
+  // Máy mới: club seed toàn B/900 — ưu tiên skill trên event cho đến khi đã có trận rated.
+  const clubHasRatedHistory = (club?.matchesRated ?? 0) > 0
+  const skillLevel = clubHasRatedHistory
+    ? (club?.skillLevel ?? participant.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL)
+    : (participant.skillLevel ?? club?.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL)
+
   return {
     key,
     canonicalName,
     clubPlayerId,
     gender: club?.gender ?? DEFAULT_CLUB_PLAYER_GENDER,
-    skillLevel:
-      club?.skillLevel ?? participant.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL,
+    skillLevel,
   }
 }
 

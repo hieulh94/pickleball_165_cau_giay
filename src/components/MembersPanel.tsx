@@ -191,6 +191,7 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   const [rankChangesReady, setRankChangesReady] = useState(false)
   const eloCacheRef = useRef(new Map<string, EloHistoryEntry[]>())
   const eloRequestIdRef = useRef(0)
+  const [eloHydrated, setEloHydrated] = useState(!isFirebaseConfigured())
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
@@ -200,8 +201,19 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
         setEventsReady(true)
         eloCacheRef.current.clear()
         setRankChangesReady(false)
+        try {
+          // Máy/trình duyệt mới: tự tính Elo từ event, không để kẹt seed B=900.
+          recomputeClubRatingsFromEvents(data)
+        } catch (err) {
+          console.error(err)
+        } finally {
+          setEloHydrated(true)
+        }
       },
-      () => setEventsReady(true),
+      () => {
+        setEventsReady(true)
+        setEloHydrated(true)
+      },
     )
   }, [])
 
@@ -456,6 +468,15 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
       {syncMessage && (
         <p className="text-sm text-neutral-600">{syncMessage}</p>
       )}
+      {!eloHydrated && isFirebaseConfigured() && (
+        <p className="flex items-center gap-2 text-sm text-neutral-500">
+          <span
+            className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600"
+            aria-hidden
+          />
+          Đang đồng bộ Elo từ lịch sử mini game…
+        </p>
+      )}
 
       <div className="flex gap-1 rounded-xl border border-border bg-neutral-50 p-1">
         {(
@@ -632,11 +653,15 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
                         onClick={() => handleOpenEloHistory(player)}
                         className="rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-700 transition hover:bg-primary-50"
                         title="Xem chi tiết cộng trừ Elo"
+                        disabled={!eloHydrated}
                       >
-                        {player.rating ?? DEFAULT_CLUB_PLAYER_RATING} Elo
-                        {(player.matchesRated ?? 0) > 0
-                          ? ` · ${player.matchesRated} trận`
-                          : ''}
+                        {!eloHydrated
+                          ? '… Elo'
+                          : `${player.rating ?? DEFAULT_CLUB_PLAYER_RATING} Elo${
+                              (player.matchesRated ?? 0) > 0
+                                ? ` · ${player.matchesRated} trận`
+                                : ''
+                            }`}
                       </button>
                     </div>
                   </div>
