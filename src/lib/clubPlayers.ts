@@ -289,33 +289,22 @@ function applyKnownNameMerges(players: ClubPlayer[]): { players: ClubPlayer[]; c
   for (const merge of KNOWN_NAME_MERGES) {
     const fromKeys = new Set(merge.from.map((n) => normalizeParticipantName(n)))
     const toKey = normalizeParticipantName(merge.to)
+    const canonicalId = buildClubPlayerId(merge.to)
     const aliases = next.filter((p) => fromKeys.has(normalizeParticipantName(p.name)))
-    const target = next.find((p) => normalizeParticipantName(p.name) === toKey)
 
+    // Target: đúng tên chuẩn, hoặc cùng id seed (đã đổi tên hiển thị).
+    const target =
+      next.find((p) => normalizeParticipantName(p.name) === toKey) ??
+      next.find((p) => p.id === canonicalId)
+
+    // Không còn alias → không tạo lại / không ép tên (tránh ghi đè khi user đổi tên).
     if (aliases.length === 0) {
-      if (!target) {
-        next.push(
-          normalizeClubPlayer({
-            id: buildClubPlayerId(merge.to),
-            name: merge.to,
-            gender: merge.gender,
-          }),
-        )
-        changed = true
-      } else if (target.name !== merge.to) {
-        // Chỉ chuẩn hóa tên — không ghi đè gender đã có
-        next = next.map((p) =>
-          p.id === target.id ? normalizeClubPlayer({ ...p, name: merge.to }) : p,
-        )
-        changed = true
-      }
       continue
     }
 
     let bestSkill: SkillLevel = target?.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL
     let bestMatches = target?.matchesRated ?? 0
-    let bestRating =
-      target?.rating ?? seedRatingFromSkillLevel(bestSkill)
+    let bestRating = target?.rating ?? seedRatingFromSkillLevel(bestSkill)
     for (const a of aliases) {
       const aSkill = migrateSkillLevel(a.skillLevel)
       const aMatches = a.matchesRated ?? 0
@@ -324,12 +313,13 @@ function applyKnownNameMerges(players: ClubPlayer[]): { players: ClubPlayer[]; c
       if (aMatches > bestMatches) bestMatches = aMatches
       if (aRating > bestRating) bestRating = aRating
     }
-    // Alias chưa chơi trận: rating theo skill mạnh nhất sau merge.
     if (bestMatches === 0) {
       bestRating = seedRatingFromSkillLevel(bestSkill)
     }
 
     const mergedGender = resolveMergeGender(target, aliases, merge.gender)
+    // Giữ tên đã đổi trên hồ sơ chuẩn; chỉ dùng merge.to khi tạo mới.
+    const displayName = target?.name ?? merge.to
 
     const removeIds = new Set(aliases.map((a) => a.id))
     if (target) removeIds.delete(target.id)
@@ -339,23 +329,28 @@ function applyKnownNameMerges(players: ClubPlayer[]): { players: ClubPlayer[]; c
     }
 
     if (target) {
-      next = next.map((p) =>
-        p.id === target.id
-          ? normalizeClubPlayer({
-              ...p,
-              name: merge.to,
-              gender: mergedGender,
-              skillLevel: bestSkill,
-              rating: bestRating,
-              matchesRated: bestMatches,
-            })
-          : p,
-      )
-      changed = true
+      const nextPlayer = normalizeClubPlayer({
+        ...target,
+        name: displayName,
+        gender: mergedGender,
+        skillLevel: bestSkill,
+        rating: bestRating,
+        matchesRated: bestMatches,
+      })
+      if (
+        nextPlayer.gender !== target.gender ||
+        nextPlayer.skillLevel !== target.skillLevel ||
+        nextPlayer.rating !== target.rating ||
+        nextPlayer.matchesRated !== target.matchesRated ||
+        nextPlayer.name !== target.name
+      ) {
+        next = next.map((p) => (p.id === target.id ? nextPlayer : p))
+        changed = true
+      }
     } else {
       next.push(
         normalizeClubPlayer({
-          id: buildClubPlayerId(merge.to),
+          id: canonicalId,
           name: merge.to,
           gender: mergedGender,
           skillLevel: bestSkill,
@@ -387,13 +382,24 @@ function applyKnownFemaleGenders(players: ClubPlayer[]): {
   return { players: next, changed }
 }
 
-/** Map tên cũ → tên chuẩn (dùng cho Elo / tìm kiếm). */
+/** Map tên cũ → tên chuẩn hiện tại trên club (hoặc merge.to nếu chưa có hồ sơ). */
 export function resolveCanonicalPlayerName(name: string): string {
   const key = normalizeParticipantName(name)
   for (const merge of KNOWN_NAME_MERGES) {
-    if (merge.from.some((n) => normalizeParticipantName(n) === key)) {
-      return merge.to
+    const isAlias = merge.from.some((n) => normalizeParticipantName(n) === key)
+    const isCanonical = normalizeParticipantName(merge.to) === key
+    if (!isAlias && !isCanonical) continue
+
+    // Đọc thẳng storage để tránh vòng lặp getClubPlayers → merge.
+    const stored = readStoredPlayers()
+    if (stored) {
+      const canonicalId = buildClubPlayerId(merge.to)
+      const current =
+        stored.find((p) => p.id === canonicalId) ??
+        stored.find((p) => normalizeParticipantName(p.name) === normalizeParticipantName(merge.to))
+      if (current?.name) return current.name.trim()
     }
+    return merge.to
   }
   return name.trim()
 }
@@ -471,8 +477,24 @@ export function findClubPlayerByName(
   name: string,
   players = getClubPlayers(),
 ): ClubPlayer | undefined {
-  const key = normalizeParticipantName(resolveCanonicalPlayerName(name))
-  return players.find((player) => normalizeParticipantName(player.name) === key)
+  const canonical = resolveCanonicalPlayerName(name)
+  const key = normalizeParticipantName(canonical)
+  const byName = players.find((player) => normalizeParticipantName(player.name) === key)
+  if (byName) return byName
+
+  // Hồ sơ đã đổi tên hiển thị nhưng vẫn giữ id seed từ tên chuẩn (VD Tùng → tên mới).
+  for (const merge of KNOWN_NAME_MERGES) {
+    const mergeKey = normalizeParticipantName(merge.to)
+    const isRelated =
+      key === mergeKey ||
+      merge.from.some((n) => normalizeParticipantName(n) === normalizeParticipantName(name))
+    if (!isRelated) continue
+    const seedId = buildClubPlayerId(merge.to)
+    const byId = players.find((player) => player.id === seedId)
+    if (byId) return byId
+  }
+
+  return undefined
 }
 
 export function filterClubPlayers(query: string, players = getClubPlayers()): ClubPlayer[] {

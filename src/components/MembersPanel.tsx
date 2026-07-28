@@ -43,17 +43,64 @@ import type { PickleballEvent, SkillLevel } from '../types'
 
 type GenderFilter = 'all' | ClubPlayerGender
 type MembersListTab = 'members' | 'promotions'
+type SkillFilter = 'all' | SkillLevel
+type EloFilter = 'all' | 'high' | 'mid' | 'low'
+type MatchesFilter = 'all' | 'played' | 'none' | '10+' | '20+'
+type MemberSort = 'name' | 'elo-desc' | 'elo-asc' | 'matches-desc' | 'matches-asc'
 
 const GENDER_FILTER_OPTIONS: { value: GenderFilter; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
+  { value: 'all', label: 'Giới tính' },
   { value: 'male', label: 'Nam' },
   { value: 'female', label: 'Nữ' },
   { value: 'other', label: 'Khác' },
 ]
 
+const SKILL_FILTER_OPTIONS: { value: SkillFilter; label: string }[] = [
+  { value: 'all', label: 'Hạng' },
+  { value: 'A', label: 'A' },
+  { value: 'B', label: 'B' },
+]
+
+const ELO_FILTER_OPTIONS: { value: EloFilter; label: string }[] = [
+  { value: 'all', label: 'Elo' },
+  { value: 'high', label: `≥ ${ELO_PROMOTE_THRESHOLD}` },
+  { value: 'mid', label: `${ELO_DEMOTE_THRESHOLD}–${ELO_PROMOTE_THRESHOLD - 1}` },
+  { value: 'low', label: `< ${ELO_DEMOTE_THRESHOLD}` },
+]
+
+const MATCHES_FILTER_OPTIONS: { value: MatchesFilter; label: string }[] = [
+  { value: 'all', label: 'Trận' },
+  { value: 'played', label: 'Đã chơi' },
+  { value: 'none', label: 'Chưa chơi' },
+  { value: '10+', label: '≥ 10' },
+  { value: '20+', label: '≥ 20' },
+]
+
+const SORT_OPTIONS: { value: MemberSort; label: string }[] = [
+  { value: 'name', label: 'Tên A–Z' },
+  { value: 'elo-desc', label: 'Elo ↓' },
+  { value: 'elo-asc', label: 'Elo ↑' },
+  { value: 'matches-desc', label: 'Trận ↓' },
+  { value: 'matches-asc', label: 'Trận ↑' },
+]
+
 function resolvePlayerGender(gender?: ClubPlayerGender): ClubPlayerGender {
   return gender ?? DEFAULT_CLUB_PLAYER_GENDER
 }
+
+function playerElo(player: ClubPlayer): number {
+  return player.rating ?? DEFAULT_CLUB_PLAYER_RATING
+}
+
+function playerMatches(player: ClubPlayer): number {
+  return player.matchesRated ?? 0
+}
+
+function playerSkill(player: ClubPlayer): SkillLevel {
+  return player.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL
+}
+
+const filterSelectClassName = `h-9 w-full ${selectClassName} py-1.5 text-xs`
 
 function LockIcon() {
   return (
@@ -122,6 +169,10 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   const { players, add, update, remove } = useClubPlayers()
   const [search, setSearch] = useState('')
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('all')
+  const [skillFilter, setSkillFilter] = useState<SkillFilter>('all')
+  const [eloFilter, setEloFilter] = useState<EloFilter>('all')
+  const [matchesFilter, setMatchesFilter] = useState<MatchesFilter>('all')
+  const [sortBy, setSortBy] = useState<MemberSort>('name')
   const [newName, setNewName] = useState('')
   const [newGender, setNewGender] = useState<ClubPlayerGender>('male')
   const [error, setError] = useState<string | null>(null)
@@ -181,16 +232,64 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
 
   const filteredPlayers = useMemo(() => {
     const normalized = normalizeParticipantName(search)
-    return players.filter((player) => {
+    const filtered = players.filter((player) => {
       if (genderFilter !== 'all' && resolvePlayerGender(player.gender) !== genderFilter) {
         return false
       }
+      if (skillFilter !== 'all' && playerSkill(player) !== skillFilter) {
+        return false
+      }
+
+      const elo = playerElo(player)
+      if (eloFilter === 'high' && elo < ELO_PROMOTE_THRESHOLD) return false
+      if (eloFilter === 'mid' && (elo < ELO_DEMOTE_THRESHOLD || elo >= ELO_PROMOTE_THRESHOLD)) {
+        return false
+      }
+      if (eloFilter === 'low' && elo >= ELO_DEMOTE_THRESHOLD) return false
+
+      const matches = playerMatches(player)
+      if (matchesFilter === 'played' && matches === 0) return false
+      if (matchesFilter === 'none' && matches > 0) return false
+      if (matchesFilter === '10+' && matches < 10) return false
+      if (matchesFilter === '20+' && matches < 20) return false
+
       if (!normalized) return true
       return normalizeParticipantName(player.name).includes(normalized)
     })
-  }, [players, search, genderFilter])
 
-  const hasActiveFilter = search.trim().length > 0 || genderFilter !== 'all'
+    return filtered.slice().sort((a, b) => {
+      switch (sortBy) {
+        case 'elo-desc':
+          return playerElo(b) - playerElo(a) || a.name.localeCompare(b.name, 'vi')
+        case 'elo-asc':
+          return playerElo(a) - playerElo(b) || a.name.localeCompare(b.name, 'vi')
+        case 'matches-desc':
+          return playerMatches(b) - playerMatches(a) || a.name.localeCompare(b.name, 'vi')
+        case 'matches-asc':
+          return playerMatches(a) - playerMatches(b) || a.name.localeCompare(b.name, 'vi')
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name, 'vi')
+      }
+    })
+  }, [players, search, genderFilter, skillFilter, eloFilter, matchesFilter, sortBy])
+
+  const hasActiveFilter =
+    search.trim().length > 0 ||
+    genderFilter !== 'all' ||
+    skillFilter !== 'all' ||
+    eloFilter !== 'all' ||
+    matchesFilter !== 'all' ||
+    sortBy !== 'name'
+
+  const resetFilters = () => {
+    setSearch('')
+    setGenderFilter('all')
+    setSkillFilter('all')
+    setEloFilter('all')
+    setMatchesFilter('all')
+    setSortBy('name')
+  }
 
   const handleAdd = () => {
     const err = add(newName, newGender)
@@ -420,30 +519,85 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
             </>
           )}
 
-          <SearchInput value={search} onChange={setSearch} placeholder="Tìm thành viên..." />
-
-          <div className="flex flex-wrap gap-2">
-            {GENDER_FILTER_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setGenderFilter(option.value)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                  genderFilter === option.value
-                    ? option.value === 'male'
-                      ? 'border-sky-400 bg-sky-100 text-sky-800'
-                      : option.value === 'female'
-                        ? 'border-rose-400 bg-rose-100 text-rose-800'
-                        : option.value === 'other'
-                          ? 'border-neutral-400 bg-neutral-100 text-neutral-700'
-                          : 'border-primary-500 bg-primary-100 text-primary-800'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50',
-                )}
+          <div className="space-y-2">
+            <SearchInput value={search} onChange={setSearch} placeholder="Tìm thành viên..." />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              <select
+                value={genderFilter}
+                onChange={(e) => setGenderFilter(e.target.value as GenderFilter)}
+                className={filterSelectClassName}
+                aria-label="Lọc giới tính"
               >
-                {option.label}
-              </button>
-            ))}
+                {GENDER_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={skillFilter}
+                onChange={(e) => setSkillFilter(e.target.value as SkillFilter)}
+                className={filterSelectClassName}
+                aria-label="Lọc hạng"
+              >
+                {SKILL_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={eloFilter}
+                onChange={(e) => setEloFilter(e.target.value as EloFilter)}
+                className={filterSelectClassName}
+                aria-label="Lọc Elo"
+              >
+                {ELO_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={matchesFilter}
+                onChange={(e) => setMatchesFilter(e.target.value as MatchesFilter)}
+                className={filterSelectClassName}
+                aria-label="Lọc số trận"
+              >
+                {MATCHES_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as MemberSort)}
+                className={cn(filterSelectClassName, 'col-span-2 sm:col-span-1')}
+                aria-label="Sắp xếp"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-xs text-neutral-500">
+              <span>
+                <span className="font-semibold text-neutral-700">{filteredPlayers.length}</span>/
+                {players.length} thành viên
+              </span>
+              {hasActiveFilter && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="font-medium text-primary-700 hover:underline"
+                >
+                  Xóa lọc
+                </button>
+              )}
+            </div>
           </div>
 
           {filteredPlayers.length === 0 ? (
