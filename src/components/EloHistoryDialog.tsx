@@ -137,7 +137,14 @@ export function EloHistoryDialog({
           </p>
 
           {loading ? (
-            <p className="mt-4 text-center text-sm text-neutral-400">Đang tải lịch sử…</p>
+            <div className="mt-8 mb-4 flex flex-col items-center gap-3 text-center">
+              <span
+                className="h-8 w-8 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600"
+                aria-hidden
+              />
+              <p className="text-sm text-neutral-500">Đang tải lịch sử Elo…</p>
+              <p className="text-xs text-neutral-400">Có thể mất vài giây lần đầu</p>
+            </div>
           ) : history.length === 0 ? (
             <p className="mt-4 text-center text-sm text-neutral-400">
               Chưa có trận mini game để tính Elo.

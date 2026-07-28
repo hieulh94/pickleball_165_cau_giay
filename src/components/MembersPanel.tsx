@@ -130,6 +130,7 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   const [events, setEvents] = useState<PickleballEvent[]>([])
   const [eventsReady, setEventsReady] = useState(!isFirebaseConfigured())
   const eloCacheRef = useRef(new Map<string, EloHistoryEntry[]>())
+  const eloRequestIdRef = useRef(0)
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
@@ -220,6 +221,7 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   }
 
   const handleOpenEloHistory = (player: ClubPlayer) => {
+    const requestId = ++eloRequestIdRef.current
     setEloTarget(player)
 
     if (!isFirebaseConfigured()) {
@@ -228,23 +230,43 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
       return
     }
 
-    if (!eventsReady) {
-      setEloHistory([])
-      setEloLoading(true)
+    const cacheKey = normalizeParticipantName(player.name)
+    const cached = eloCacheRef.current.get(cacheKey)
+    if (cached && eventsReady) {
+      setEloHistory(cached)
+      setEloLoading(false)
       return
     }
 
-    // Dùng events đã subscribe sẵn — không fetch Firestore mỗi lần click.
-    setEloHistory(resolveEloHistory(player, events))
-    setEloLoading(false)
+    // Mở dialog + loading ngay; tính Elo sau khi UI kịp vẽ.
+    setEloHistory([])
+    setEloLoading(true)
+
+    if (!eventsReady) return
+
+    const eventList = events
+    requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        if (eloRequestIdRef.current !== requestId) return
+        setEloHistory(resolveEloHistory(player, eventList))
+        setEloLoading(false)
+      }, 0)
+    })
   }
 
   // Mở Elo trước khi snapshot Firebase về → điền khi sẵn sàng.
   useEffect(() => {
     if (!eloTarget || !eloLoading || !eventsReady || !isFirebaseConfigured()) return
-    setEloHistory(resolveEloHistory(eloTarget, events))
-    setEloLoading(false)
-    // resolveEloHistory đọc ref cache; chỉ phụ thuộc data/target.
+    const requestId = eloRequestIdRef.current
+    const player = eloTarget
+    const eventList = events
+    requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        if (eloRequestIdRef.current !== requestId) return
+        setEloHistory(resolveEloHistory(player, eventList))
+        setEloLoading(false)
+      }, 0)
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [eloTarget, eloLoading, eventsReady, events])
 
