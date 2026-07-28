@@ -10,6 +10,7 @@ import {
 import { syncClubPlayerRenameInEvents } from '../lib/clubPlayerSync'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
+import type { SkillLevel } from '../types'
 
 export function useClubPlayers() {
   const [players, setPlayers] = useState<ClubPlayer[]>(() => getClubPlayers())
@@ -29,7 +30,7 @@ export function useClubPlayers() {
 
   const update = async (
     id: string,
-    input: { name: string; gender?: ClubPlayerGender },
+    input: { name: string; gender?: ClubPlayerGender; skillLevel?: SkillLevel },
   ): Promise<string | null> => {
     const previous = getClubPlayers().find((player) => player.id === id)
     const result = updateClubPlayer(id, input)

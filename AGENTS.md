@@ -49,7 +49,7 @@ vercel.json                  # SPA rewrite → index.html
 
 ## Model dữ liệu (`src/types/index.ts`)
 
-- **Participant**: `skillLevel` chỉ `1 | 2`
+- **Participant**: `skillLevel` chỉ `'A' | 'B'` (A mạnh hơn B)
 - **Pair**: hai `playerId`, optional `group` (tên bảng, VD `Bảng A`), `isManual` / `locked` cho ghép tay
 - **Match**: `round`, `court`, `phase` (`group` | `playoff` | `showmatch`), `scheduledAt?`, `showmatchFormat?` (`best_of_3`), `games?[]`, `completed`; showmatch Bo3: `score1`/`score2` = số ván thắng
 - **PickleballEvent**: document Firestore; gồm `eventType` (`tournament` | `showmatch`), `accessCode`, `accessPassword`, `splitGroups`, `groupCount`, `courts[]`, `participants`, `pairs`, `matches`
@@ -62,7 +62,7 @@ Firestore: collection `events`, document id = `event.id`. Schema mô tả trong 
 |------|-------------|
 | `lib/storage.ts` | `subscribeEvents`, `subscribeEvent`, `upsertEvent`, `deleteEvent`; migrate `courtCount` → `courts[]`; chuẩn hóa `accessCode` uppercase |
 | `lib/firebase.ts` | Init app, `isFirebaseConfigured()`, `getDb()` |
-| `lib/pairing.ts` | `randomPairs`: ghép chéo trình độ 1↔2 (số lượng hai level phải bằng nhau), hoặc shuffle thuần; `shuffleArray`, `getPairLabel` |
+| `lib/pairing.ts` | `randomPairs`: ghép chéo trình độ A↔B (số lượng hai level phải bằng nhau), hoặc shuffle thuần; `shuffleArray`, `getPairLabel` |
 | `lib/groups.ts` | Chia bảng A–Z (`MIN_GROUP_COUNT` 2, `MAX_GROUP_COUNT` 26), `applyGroupsToPairs` |
 | `lib/schedule.ts` | `generateSchedule`: round-robin trong từng bảng, gói theo số sân; chèn vòng nghỉ nếu không thể tránh cặp đá liên tiếp (VD 4 cặp / 1 sân) |
 | `lib/matches.ts` | `isGroupMatch` / `isPlayoffMatch` / `isShowMatch` — playoff/showmatch **không** tính BXH |
@@ -71,7 +71,7 @@ Firestore: collection `events`, document id = `event.id`. Schema mô tả trong 
 | `lib/standings.ts` | `calculateStandings`, xếp hạng: thắng → hiệu số → điểm ghi |
 | `lib/pairColors.ts` | Màu thẻ cặp theo số thứ tự |
 
-**Quy tắc ghép cặp:** Có cả level 1 và 2 → mỗi cặp gồm 1 người mỗi level. Chỉ một level → ghép ngẫu nhiên trong nhóm.
+**Quy tắc ghép cặp:** Có cả trình độ A và B → mỗi cặp gồm 1 người mỗi trình độ (A mạnh hơn B). Chỉ một trình độ → ghép ngẫu nhiên trong nhóm.
 
 **Lịch đấu:** User nhập danh sách số sân cụ thể (VD `1, 3, 5`), không chỉ “số lượng sân”.
 

@@ -89,6 +89,8 @@ function formatPodiumMetric(
       return `${row.matchesPlayed} trận`
     case 'contribution':
       return contributionLabel(row.eventsContributed, source)
+    case 'rating':
+      return `${row.rating ?? 0} Elo`
   }
 }
 

@@ -8,7 +8,10 @@ import { FirebaseSetupNotice } from '../components/FirebaseSetupNotice'
 import { ManualSchedulePanel } from '../components/ManualSchedulePanel'
 import { PlayoffSection } from '../components/PlayoffSection'
 import { PlayerNameInput } from '../components/PlayerNameInput'
-import { PlayerPickerDialog } from '../components/PlayerPickerDialog'
+import {
+  PlayerPickerDialog,
+  type PlayerPickerSelection,
+} from '../components/PlayerPickerDialog'
 import { SkillLevelBadge } from '../components/SkillLevelBadge'
 import { PairGroupSelect } from '../components/PairGroupSelect'
 import { PairScheduleDialog } from '../components/PairScheduleDialog'
@@ -23,11 +26,12 @@ import {
   UNASSIGNED_GROUP_LABEL,
 } from '../lib/groups'
 import { filterGroupMatches, filterPlayoffMatches, isGroupMatch, isPlayoffMatch } from '../lib/matches'
-import { getPairLabel, randomPairs } from '../lib/pairing'
+import { getPairLabel, randomPairs, randomPairsBalancedElo } from '../lib/pairing'
 import {
   areParticipantsIncompatible,
   getParticipantGender,
 } from '../lib/participantGender'
+import { getParticipantRating } from '../lib/playerRating'
 import { getRandomPairSettings } from '../lib/randomPairSettings'
 import { attachClubPlayerId, participantFromClubSelection } from '../lib/clubPlayerSync'
 import {
@@ -77,7 +81,7 @@ import { ShowMatchEventPage } from './ShowMatchEventPage'
 import { Button } from '../components/ui/Button'
 import { BackLink } from '../components/ui/BackLink'
 import { CompactEventHeader } from '../components/ui/CompactEventHeader'
-import type { Match, Pair, Participant, PickleballEvent, PlayoffConfig, SkillLevel } from '../types'
+import type { Match, Pair, Participant, PickleballEvent, PlayoffConfig } from '../types'
 
 function isManualPair(pair: Pair) {
   return pair.isManual === true || (pair.isManual === undefined && pair.locked === true)
@@ -159,7 +163,6 @@ export function EventPage() {
   const [error, setError] = useState<string | null>(null)
   const [participantPickerOpen, setParticipantPickerOpen] = useState(false)
   const [contributionDialogOpen, setContributionDialogOpen] = useState(false)
-  const [skillLevel, setSkillLevel] = useState<SkillLevel>(1)
   const [courtInput, setCourtInput] = useState('')
   const [manualPlayer1Name, setManualPlayer1Name] = useState('')
   const [manualPlayer2Name, setManualPlayer2Name] = useState('')
@@ -529,7 +532,7 @@ export function EventPage() {
     return false
   }
 
-  const addParticipants = (rawNames: string[]) => {
+  const addParticipants = (selections: PlayerPickerSelection[]) => {
     if (event.participantsLocked) {
       alert('Danh sách người tham gia đã được chốt.')
       return
@@ -539,13 +542,13 @@ export function EventPage() {
     )
     const toAdd: Participant[] = []
 
-    for (const rawName of rawNames) {
-      const trimmed = rawName.trim()
+    for (const selection of selections) {
+      const trimmed = selection.name.trim()
       if (!trimmed) continue
       const normalized = normalizeParticipantName(trimmed)
       if (existing.has(normalized)) continue
       existing.add(normalized)
-      toAdd.push(participantFromClubSelection(trimmed, skillLevel))
+      toAdd.push(participantFromClubSelection(trimmed, selection.skillLevel))
     }
 
     if (toAdd.length === 0) {
@@ -686,6 +689,7 @@ export function EventPage() {
         {
           avoidFemaleFemalePairs: pairSettings.avoidFemaleFemalePairs,
           getGender: getParticipantGender,
+          getRating: getParticipantRating,
           cannotPair: areParticipantsIncompatible,
         },
       )
@@ -743,6 +747,55 @@ export function EventPage() {
     setShowRandomPairsConfirm(true)
   }
 
+  const handleRandomBalancedElo = () => {
+    if (event.pairsLocked) {
+      alert('Cặp đôi đã được chốt.')
+      return
+    }
+    const lockedPairs = event.pairs.filter((pair) => isManualPair(pair))
+    const lockedIds = new Set(lockedPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]))
+    const remainingParticipants = event.participants.filter((p) => !lockedIds.has(p.id))
+
+    if (lockedPairs.length === 0 && event.participants.length < 2) {
+      alert('Cần ít nhất 2 người tham gia.')
+      return
+    }
+    if (remainingParticipants.length > 0 && remainingParticipants.length % 2 !== 0) {
+      alert('Số người còn lại phải là số chẵn để ghép cặp đôi.')
+      return
+    }
+
+    if (remainingParticipants.length === 0) return
+
+    const pairSettings = getRandomPairSettings()
+    const result = randomPairsBalancedElo(remainingParticipants, {
+      avoidFemaleFemalePairs: pairSettings.avoidFemaleFemalePairs,
+      getGender: getParticipantGender,
+      getRating: getParticipantRating,
+      cannotPair: areParticipantsIncompatible,
+    })
+    if ('error' in result) {
+      alert(result.error)
+      return
+    }
+    const generatedPairs = result.pairs.map((pair) => ({ ...pair, locked: false }))
+
+    const finalPairs = event.splitGroups
+      ? applyGroupsToPairs(
+          [...lockedPairs, ...generatedPairs],
+          true,
+          event.groupCount,
+          'manual',
+        )
+      : [...lockedPairs, ...generatedPairs]
+
+    persist({
+      ...event,
+      pairs: finalPairs,
+      matches: [],
+    })
+  }
+
   const handleAddManualPair = () => {
     if (event.pairsLocked) {
       alert('Cặp đôi đã được chốt.')
@@ -785,7 +838,7 @@ export function EventPage() {
       const created = attachClubPlayerId({
         id: crypto.randomUUID(),
         name: rawName.trim().replace(/\s+/g, ' '),
-        skillLevel: 1,
+        skillLevel: 'B',
         isManualEntry: true,
       })
       allParticipants.push(created)
@@ -1363,7 +1416,7 @@ export function EventPage() {
       <CollapsibleSection
         id="section-participants"
         title="Người tham gia"
-        description="Chọn nhiều người từ danh sách CLB, gán trình độ (1 hoặc 2)"
+        description="Chọn nhiều người từ danh sách CLB, gán trình độ (A hoặc B — A cao hơn)"
         visible={sectionVisibility.participants}
         headerExtra={
           canEdit ? (
@@ -1402,7 +1455,11 @@ export function EventPage() {
                       TT {manualEntryOrderById.get(p.id)}
                     </span>
                   ) : !p.isManualEntry ? (
-                    <SkillLevelBadge level={p.skillLevel} className="mt-1" />
+                    <SkillLevelBadge
+                      level={p.skillLevel}
+                      gender={getParticipantGender(p)}
+                      className="mt-1"
+                    />
                   ) : null}
                 </div>
                 {canEdit && !event.participantsLocked && (
@@ -1427,7 +1484,7 @@ export function EventPage() {
       <CollapsibleSection
         id="section-pairs"
         title="Cặp đôi"
-        description="Ghép ngẫu nhiên — nếu có cả trình độ 1 và 2 thì mỗi cặp gồm 1 người mỗi trình độ"
+        description="Ghép ngẫu nhiên — nếu có cả trình độ A và B thì mỗi cặp gồm 1 người mỗi trình độ"
         visible={sectionVisibility.pairs}
         headerExtra={
           canEdit ? (
@@ -1498,13 +1555,22 @@ export function EventPage() {
             🔒 Đã chốt phân bảng.
           </p>
         )}
-        <Button
-          onClick={requestRandomPairs}
-          disabled={!canEdit || event.pairsLocked}
-          className="bg-neutral-900 hover:bg-neutral-800"
-        >
-          🎲 Random cặp đôi
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={requestRandomPairs}
+            disabled={!canEdit || event.pairsLocked}
+            className="bg-neutral-900 hover:bg-neutral-800"
+          >
+            🎲 Random cặp đôi
+          </Button>
+          <Button
+            onClick={handleRandomBalancedElo}
+            disabled={!canEdit || event.pairsLocked}
+            className="bg-emerald-700 hover:bg-emerald-600"
+          >
+            ⚖️ Random cân bằng Elo
+          </Button>
+        </div>
 
         <div
           className={`mt-4 rounded-xl border border-primary-200 bg-primary-50 p-4 ${
@@ -1628,6 +1694,18 @@ export function EventPage() {
                         <p className="mt-0.5 text-sm leading-snug">
                           {getPairShortLabel(pair, event.participants)}
                           <PairTypeBadge pair={pair} />
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-neutral-500">
+                          Elo TB:{' '}
+                          {Math.round(
+                            (getParticipantRating(
+                              event.participants.find((p) => p.id === pair.player1Id)!,
+                            ) +
+                              getParticipantRating(
+                                event.participants.find((p) => p.id === pair.player2Id)!,
+                              )) /
+                              2,
+                          )}
                         </p>
                       </div>
                     )
@@ -2034,8 +2112,6 @@ export function EventPage() {
       <PlayerPickerDialog
         open={participantPickerOpen}
         multiple
-        skillLevel={skillLevel}
-        onSkillLevelChange={setSkillLevel}
         excludedNames={event.participants.map((p) => p.name)}
         onClose={() => setParticipantPickerOpen(false)}
         onSelectMany={addParticipants}

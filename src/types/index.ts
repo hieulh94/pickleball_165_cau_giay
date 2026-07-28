@@ -1,4 +1,5 @@
-export type SkillLevel = 1 | 2
+/** A = mạnh hơn, B = yếu hơn */
+export type SkillLevel = 'A' | 'B'
 
 export interface Participant {
   id: string

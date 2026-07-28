@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   filterClubPlayers,
+  findClubPlayerByName,
+  formatGenderSkillLabel,
+  getClubPlayerSkillLevel,
   getPlayerAvatarColor,
   getPlayerInitials,
 } from '../lib/clubPlayers'
@@ -8,6 +11,13 @@ import { formatParticipantName, normalizeParticipantName } from '../lib/showmatc
 import { cn } from '../lib/cn'
 import { getSkillLevelToggleClass } from '../lib/skillLevelStyles'
 import type { SkillLevel } from '../types'
+
+export interface PlayerPickerSelection {
+  name: string
+  skillLevel: SkillLevel
+}
+
+type SkillAssignMode = 'club' | SkillLevel
 
 interface PlayerPickerDialogBaseProps {
   open: boolean
@@ -23,9 +33,7 @@ interface PlayerPickerDialogSingleProps extends PlayerPickerDialogBaseProps {
 
 interface PlayerPickerDialogMultiProps extends PlayerPickerDialogBaseProps {
   multiple: true
-  skillLevel: SkillLevel
-  onSkillLevelChange: (level: SkillLevel) => void
-  onSelectMany: (names: string[]) => void
+  onSelectMany: (selections: PlayerPickerSelection[]) => void
 }
 
 type PlayerPickerDialogProps = PlayerPickerDialogSingleProps | PlayerPickerDialogMultiProps
@@ -42,12 +50,14 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
   const [search, setSearch] = useState('')
   const [manualName, setManualName] = useState('')
   const [selectedNames, setSelectedNames] = useState<string[]>([])
+  const [skillMode, setSkillMode] = useState<SkillAssignMode>('club')
 
   useEffect(() => {
     if (!open) return
     setSearch('')
     setManualName('')
     setSelectedNames([])
+    setSkillMode('club')
   }, [open])
 
   const excludedSet = useMemo(
@@ -61,6 +71,11 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
   )
 
   const filteredPlayers = useMemo(() => filterClubPlayers(search), [search])
+
+  const resolveSkillForName = (name: string): SkillLevel => {
+    if (skillMode !== 'club') return skillMode
+    return getClubPlayerSkillLevel(findClubPlayerByName(name))
+  }
 
   if (!open) return null
 
@@ -111,11 +126,14 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
   const handleConfirmMany = () => {
     if (!multiple || !('onSelectMany' in props)) return
     if (selectedNames.length === 0) return
-    props.onSelectMany(selectedNames)
+    props.onSelectMany(
+      selectedNames.map((name) => ({
+        name,
+        skillLevel: resolveSkillForName(name),
+      })),
+    )
     onClose()
   }
-
-  const skillLevel = multiple && 'skillLevel' in props ? props.skillLevel : 1
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -125,28 +143,45 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
           <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
           <p className="mt-1 text-sm text-neutral-500">
             {multiple
-              ? 'Chọn nhiều người từ danh sách CLB, gán trình độ rồi thêm vào event.'
+              ? 'Chọn nhiều người từ danh sách CLB. Mặc định lấy trình độ từng người từ CLB.'
               : 'Chọn từ danh sách CLB hoặc thêm tên mới bên dưới.'}
           </p>
 
-          {multiple && 'onSkillLevelChange' in props && (
+          {multiple && (
             <div className="mt-3">
-              <p className="text-sm font-medium text-neutral-700">Trình độ</p>
+              <p className="text-sm font-medium text-neutral-700">Trình độ khi thêm</p>
               <div className="mt-1.5 flex gap-2">
-                {([1, 2] as const).map((level) => (
+                <button
+                  type="button"
+                  onClick={() => setSkillMode('club')}
+                  className={cn(
+                    'flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors',
+                    skillMode === 'club'
+                      ? 'border-primary-600 bg-primary-50 text-primary-800'
+                      : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
+                  )}
+                >
+                  Theo CLB
+                </button>
+                {(['A', 'B'] as const).map((level) => (
                   <button
                     key={level}
                     type="button"
-                    onClick={() => props.onSkillLevelChange(level)}
+                    onClick={() => setSkillMode(level)}
                     className={cn(
                       'flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors',
-                      getSkillLevelToggleClass(level, skillLevel === level),
+                      getSkillLevelToggleClass(level, skillMode === level),
                     )}
                   >
-                    Trình độ {level}
+                    Ghi đè {level}
                   </button>
                 ))}
               </div>
+              <p className="mt-1.5 text-xs text-neutral-500">
+                {skillMode === 'club'
+                  ? 'Mỗi người giữ trình độ trên danh sách CLB (tên mới → B).'
+                  : `Tất cả người được chọn sẽ gán trình độ ${skillMode}.`}
+              </p>
             </div>
           )}
 
@@ -166,18 +201,24 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
               Đã chọn ({selectedNames.length})
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {selectedNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => toggleSelection(name)}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-800 hover:bg-primary-100"
-                  title="Bỏ chọn"
-                >
-                  {name}
-                  <span aria-hidden>×</span>
-                </button>
-              ))}
+              {selectedNames.map((name) => {
+                const level = resolveSkillForName(name)
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleSelection(name)}
+                    className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-800 hover:bg-primary-100"
+                    title="Bỏ chọn"
+                  >
+                    {name}
+                    <span className="rounded bg-white/80 px-1 font-semibold text-primary-700">
+                      {level}
+                    </span>
+                    <span aria-hidden>×</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -226,9 +267,18 @@ export function PlayerPickerDialog(props: PlayerPickerDialogProps) {
                       >
                         {getPlayerInitials(player.name)}
                       </div>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">
-                        {player.name}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-neutral-900">
+                          {player.name}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-neutral-500">
+                          {formatGenderSkillLabel(
+                            player.gender,
+                            getClubPlayerSkillLevel(player),
+                          )}
+                          {player.rating != null ? ` · ${Math.round(player.rating)} Elo` : ''}
+                        </span>
+                      </div>
                       {isExcluded ? (
                         <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
                           Đã có

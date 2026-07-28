@@ -15,7 +15,7 @@ const SOURCE_OPTIONS: { id: LeaderboardSource; label: string }[] = [
 ]
 
 function metricOptions(source: LeaderboardSource): { id: LeaderboardMetric; label: string }[] {
-  return [
+  const options: { id: LeaderboardMetric; label: string }[] = [
     { id: 'earnings', label: '🍺 Beer cống hiến' },
     { id: 'wins', label: '🏆 Thắng' },
     { id: 'matches', label: '🎾 Trận' },
@@ -24,6 +24,10 @@ function metricOptions(source: LeaderboardSource): { id: LeaderboardMetric; labe
       label: source === 'showmatch' ? '⭐ Showmatch' : '⭐ Mini game',
     },
   ]
+  if (source === 'tournament') {
+    options.push({ id: 'rating', label: '📈 Điểm Elo' })
+  }
+  return options
 }
 
 type FilterMenuId = 'source' | 'period' | 'metric'

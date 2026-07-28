@@ -4,10 +4,12 @@ import {
   type LeaderboardSource,
   type PlayerContributionStats,
 } from './contributionStandings'
+import { computePlayerRatings } from './playerRating'
+import { normalizeParticipantName } from './showmatchParticipants'
 import type { PickleballEvent } from '../types'
 
 export type LeaderboardPeriod = 'today' | 'week' | 'month' | 'all'
-export type LeaderboardMetric = 'earnings' | 'wins' | 'matches' | 'contribution'
+export type LeaderboardMetric = 'earnings' | 'wins' | 'matches' | 'contribution' | 'rating'
 export type { LeaderboardSource } from './contributionStandings'
 
 export interface LeaderboardStanding extends ContributionStanding {
@@ -151,6 +153,8 @@ function metricValue(
       return row.matchesPlayed
     case 'contribution':
       return contributionCount(row, source)
+    case 'rating':
+      return 0
   }
 }
 
@@ -199,6 +203,8 @@ function getRowMetricValue(
       return row.matchesPlayed
     case 'contribution':
       return row.eventsContributed
+    case 'rating':
+      return row.rating ?? 0
   }
 }
 
@@ -236,7 +242,36 @@ export function getStandingMetricValue(
       return row.matchesPlayed
     case 'contribution':
       return row.eventsContributed
+    case 'rating':
+      return row.rating ?? 0
   }
+}
+
+function buildRatingStandings(
+  events: PickleballEvent[],
+  range: DateRange | null,
+): Omit<ContributionStanding, 'rank'>[] {
+  const filtered = filterEventsByRange(events, range, 'tournament')
+  const ratings = computePlayerRatings(filtered)
+  const contrib = buildPlayerContributionStats(filtered, 'tournament')
+  const contribByName = new Map(
+    contrib.map((row) => [normalizeParticipantName(row.displayName), row]),
+  )
+
+  return ratings
+    .filter((row) => row.matchesRated > 0)
+    .map((row) => {
+      const stats = contribByName.get(normalizeParticipantName(row.name))
+      return {
+        name: row.name,
+        totalAmount: stats?.totalAmount ?? 0,
+        eventsContributed: stats ? contributionCount(stats, 'tournament') : 0,
+        matchesPlayed: row.matchesRated,
+        wins: row.wins,
+        rating: row.rating,
+        skillLevel: row.skillLevel,
+      }
+    })
 }
 
 export function calculateLeaderboardStandings(
@@ -246,6 +281,23 @@ export function calculateLeaderboardStandings(
   const now = options.now ?? new Date()
   const source = options.source ?? 'tournament'
   const range = getPeriodRange(options.period, now)
+
+  // Elo chỉ áp dụng mini game
+  if (options.metric === 'rating') {
+    const rows = buildRatingStandings(events, range)
+    const standings = assignRanksByMetric(rows, 'rating')
+    const previousRange = getPreviousPeriodRange(options.period, now)
+    const previousRows = buildRatingStandings(events, previousRange)
+    const previousStandings = assignRanksByMetric(previousRows, 'rating')
+    const previousRankByName = new Map(previousStandings.map((row) => [row.name, row.rank]))
+
+    return standings.map((row) => {
+      const previousRank = previousRankByName.get(row.name)
+      const trend = previousRank === undefined ? null : previousRank - row.rank
+      return { ...row, trend }
+    })
+  }
+
   const filtered = filterEventsByRange(events, range, source)
   const stats = buildPlayerContributionStats(filtered, source)
   const rows = sortRows(stats, options.metric, source)

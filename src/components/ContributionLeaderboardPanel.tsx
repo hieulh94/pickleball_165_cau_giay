@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ContributionHistoryDialog } from './ContributionHistoryDialog'
+import { EloHistoryDialog } from './EloHistoryDialog'
 import { LeaderboardUnlockGate } from './LeaderboardUnlockGate'
 import { LeaderboardFilters } from './leaderboard/LeaderboardFilters'
 import { LeaderboardPodium } from './leaderboard/LeaderboardPodium'
@@ -15,6 +16,11 @@ import {
 } from '../lib/leaderboard'
 import { isFirebaseConfigured } from '../lib/firebase'
 import { isLeaderboardAccessGranted } from '../lib/leaderboardAccess'
+import { DEFAULT_CLUB_PLAYER_RATING } from '../lib/clubPlayers'
+import {
+  getPlayerEloHistory,
+  recomputeClubRatingsFromEvents,
+} from '../lib/playerRating'
 import { subscribeEvents } from '../lib/storage'
 import type { PickleballEvent } from '../types'
 
@@ -34,10 +40,22 @@ export function ContributionLeaderboardPanel() {
       (data) => {
         setEvents(data)
         setLoading(false)
+        try {
+          recomputeClubRatingsFromEvents(data)
+        } catch (err) {
+          console.error(err)
+        }
       },
       () => setLoading(false),
     )
   }, [])
+
+  const handleSourceChange = (next: LeaderboardSource) => {
+    setSource(next)
+    if (next === 'showmatch' && metric === 'rating') {
+      setMetric('earnings')
+    }
+  }
 
   const standings = useMemo(
     () => calculateLeaderboardStandings(events, { period, metric, source }),
@@ -53,9 +71,14 @@ export function ContributionLeaderboardPanel() {
   const listStandings = standings
 
   const selectedHistory = useMemo(() => {
-    if (!selectedPlayer) return []
+    if (!selectedPlayer || metric === 'rating') return []
     return getPlayerContributionHistory(events, selectedPlayer.name, source)
-  }, [events, selectedPlayer, source])
+  }, [events, selectedPlayer, source, metric])
+
+  const selectedEloHistory = useMemo(() => {
+    if (!selectedPlayer || metric !== 'rating') return []
+    return getPlayerEloHistory(events, selectedPlayer.name)
+  }, [events, selectedPlayer, metric])
 
   if (!isFirebaseConfigured()) return null
 
@@ -72,7 +95,7 @@ export function ContributionLeaderboardPanel() {
           source={source}
           onPeriodChange={setPeriod}
           onMetricChange={setMetric}
-          onSourceChange={setSource}
+          onSourceChange={handleSourceChange}
         />
       </div>
 
@@ -111,15 +134,32 @@ export function ContributionLeaderboardPanel() {
             </div>
           </div>
 
-          <ContributionHistoryDialog
-            open={!!selectedPlayer}
-            playerName={selectedPlayer?.name ?? ''}
-            rank={selectedPlayer?.rank}
-            totalAmount={selectedPlayer?.totalAmount ?? 0}
-            history={selectedHistory}
-            source={source}
-            onClose={() => setSelectedPlayer(null)}
-          />
+          {metric === 'rating' ? (
+            <EloHistoryDialog
+              open={!!selectedPlayer}
+              playerName={selectedPlayer?.name ?? ''}
+              rating={selectedPlayer?.rating ?? DEFAULT_CLUB_PLAYER_RATING}
+              skillLevel={selectedPlayer?.skillLevel}
+              wins={selectedPlayer?.wins}
+              losses={
+                selectedPlayer
+                  ? Math.max(0, (selectedPlayer.matchesPlayed ?? 0) - (selectedPlayer.wins ?? 0))
+                  : undefined
+              }
+              history={selectedEloHistory}
+              onClose={() => setSelectedPlayer(null)}
+            />
+          ) : (
+            <ContributionHistoryDialog
+              open={!!selectedPlayer}
+              playerName={selectedPlayer?.name ?? ''}
+              rank={selectedPlayer?.rank}
+              totalAmount={selectedPlayer?.totalAmount ?? 0}
+              history={selectedHistory}
+              source={source}
+              onClose={() => setSelectedPlayer(null)}
+            />
+          )}
         </>
       )}
     </div>

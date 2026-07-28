@@ -31,7 +31,7 @@ export function findOrCreateParticipant(
   const created: Participant = attachClubPlayerId({
     id: crypto.randomUUID(),
     name: formatParticipantName(rawName),
-    skillLevel: 1,
+    skillLevel: 'B',
     isManualEntry: true,
   })
   return { participants: [...participants, created], participant: created }

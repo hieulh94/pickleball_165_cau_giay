@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
+import { EloHistoryDialog } from './EloHistoryDialog'
 import { MemberEditDialog, MemberGenderBadge } from './MemberEditDialog'
+import { SkillLevelBadge } from './SkillLevelBadge'
 import { SearchInput } from './ui/SearchInput'
 import { SectionLabel } from './ui/SectionLabel'
 import { Button } from './ui/Button'
@@ -8,17 +10,28 @@ import { inputClassName, selectClassName } from './ui/styles'
 import { useClubPlayers } from '../hooks/useClubPlayers'
 import {
   DEFAULT_CLUB_PLAYER_GENDER,
+  DEFAULT_CLUB_PLAYER_RATING,
+  DEFAULT_CLUB_PLAYER_SKILL_LEVEL,
   getPlayerAvatarColor,
   getPlayerInitials,
+  type ClubPlayer,
   type ClubPlayerGender,
 } from '../lib/clubPlayers'
 import { cn } from '../lib/cn'
+import { isFirebaseConfigured } from '../lib/firebase'
 import {
   grantMembersAccess,
   isMembersAccessGranted,
   verifyMembersPassword,
 } from '../lib/membersAccess'
+import {
+  getPlayerEloHistory,
+  recomputeClubRatingsFromEvents,
+  type EloHistoryEntry,
+} from '../lib/playerRating'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
+import { fetchAllEvents } from '../lib/storage'
+import type { SkillLevel } from '../types'
 
 type GenderFilter = 'all' | ClubPlayerGender
 
@@ -99,6 +112,11 @@ function MembersPanelContent() {
   const [error, setError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [editTarget, setEditTarget] = useState<(typeof players)[number] | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [eloTarget, setEloTarget] = useState<ClubPlayer | null>(null)
+  const [eloHistory, setEloHistory] = useState<EloHistoryEntry[]>([])
+  const [eloLoading, setEloLoading] = useState(false)
 
   const filteredPlayers = useMemo(() => {
     const normalized = normalizeParticipantName(search)
@@ -124,7 +142,11 @@ function MembersPanelContent() {
     setError(null)
   }
 
-  const handleSaveEdit = async (input: { name: string; gender?: ClubPlayerGender }) => {
+  const handleSaveEdit = async (input: {
+    name: string
+    gender?: ClubPlayerGender
+    skillLevel?: SkillLevel
+  }) => {
     if (!editTarget) return 'Không tìm thấy thành viên.'
     return update(editTarget.id, input)
   }
@@ -135,16 +157,72 @@ function MembersPanelContent() {
     setDeleteTarget(null)
   }
 
+  const handleSyncRatings = async () => {
+    if (!isFirebaseConfigured()) {
+      setSyncMessage('Chưa cấu hình Firebase — không tải được lịch sử event.')
+      return
+    }
+    setSyncing(true)
+    setSyncMessage(null)
+    try {
+      const events = await fetchAllEvents()
+      const { updated, rows } = recomputeClubRatingsFromEvents(events)
+      setSyncMessage(
+        updated > 0
+          ? `Đã cập nhật ${updated} thành viên từ ${rows.filter((r) => r.matchesRated > 0).length} người có trận mini game.`
+          : rows.some((r) => r.matchesRated > 0)
+            ? 'Điểm đã đồng bộ — không có thay đổi mới.'
+            : 'Chưa có trận mini game hoàn thành để tính điểm.',
+      )
+    } catch (err) {
+      console.error(err)
+      setSyncMessage('Không đồng bộ được. Kiểm tra mạng và thử lại.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleOpenEloHistory = async (player: ClubPlayer) => {
+    if (!isFirebaseConfigured()) {
+      setEloTarget(player)
+      setEloHistory([])
+      return
+    }
+    setEloTarget(player)
+    setEloLoading(true)
+    try {
+      const events = await fetchAllEvents()
+      setEloHistory(getPlayerEloHistory(events, player.name))
+    } catch (err) {
+      console.error(err)
+      setEloHistory([])
+    } finally {
+      setEloLoading(false)
+    }
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <SectionLabel>Thành viên CLB</SectionLabel>
           <p className="mt-1 text-sm text-text-secondary">
-            {players.length} thành viên · đổi tên sẽ cập nhật sang event và BXH
+            {players.length} thành viên · điểm Elo từ mini game · trình độ Nam/Nữ × A–B
           </p>
         </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleSyncRatings}
+          disabled={syncing}
+          className="shrink-0"
+        >
+          {syncing ? 'Đang đồng bộ…' : 'Đồng bộ điểm từ event'}
+        </Button>
       </div>
+      {syncMessage && (
+        <p className="text-sm text-neutral-600">{syncMessage}</p>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <input
@@ -223,9 +301,33 @@ function MembersPanelContent() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-text-primary">{player.name}</p>
-                <MemberGenderBadge gender={player.gender} />
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <MemberGenderBadge gender={player.gender} />
+                  <SkillLevelBadge
+                    level={player.skillLevel ?? DEFAULT_CLUB_PLAYER_SKILL_LEVEL}
+                    gender={player.gender ?? DEFAULT_CLUB_PLAYER_GENDER}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEloHistory(player)}
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary-700 transition hover:bg-primary-50"
+                    title="Xem chi tiết cộng trừ Elo"
+                  >
+                    {player.rating ?? DEFAULT_CLUB_PLAYER_RATING} Elo
+                    {(player.matchesRated ?? 0) > 0
+                      ? ` · ${player.matchesRated} trận`
+                      : ''}
+                  </button>
+                </div>
               </div>
               <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEloHistory(player)}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
+                >
+                  Elo
+                </button>
                 <button
                   type="button"
                   onClick={() => setEditTarget(player)}
@@ -252,6 +354,19 @@ function MembersPanelContent() {
         player={editTarget}
         onClose={() => setEditTarget(null)}
         onSave={handleSaveEdit}
+      />
+
+      <EloHistoryDialog
+        open={eloTarget !== null}
+        playerName={eloTarget?.name ?? ''}
+        rating={eloTarget?.rating ?? DEFAULT_CLUB_PLAYER_RATING}
+        skillLevel={eloTarget?.skillLevel}
+        history={eloHistory}
+        loading={eloLoading}
+        onClose={() => {
+          setEloTarget(null)
+          setEloHistory([])
+        }}
       />
 
       <ConfirmDialog

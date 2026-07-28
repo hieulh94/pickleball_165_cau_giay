@@ -26,6 +26,8 @@ function formatMetricLabel(
       return source === 'showmatch'
         ? `${row.eventsContributed} trận SM`
         : `${row.eventsContributed} mini game`
+    case 'rating':
+      return `${row.rating ?? 0} Elo`
   }
 }
 

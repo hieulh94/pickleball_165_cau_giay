@@ -15,7 +15,7 @@ Dữ liệu lưu trên **Firebase Firestore** — đồng bộ giữa mọi thi�
 - **Lịch thi đấu** — Nhập số sân cụ thể (VD: 1, 3, 5) rồi tạo lịch vòng bảng
 - **Cập nhật kết quả** — Dialog nhập điểm + xác nhận trước khi lưu
 - **Bảng xếp hạng** — Tự động cập nhật theo kết quả trận đấu
-- **Playoff tự động** — Cấu hình a (tranh giải) / b (tranh hạng) mỗi bảng; khi vòng bảng xong tự sinh bracket từ BXH (cross-seed; 2 bảng: cùng hạng quyết định luôn chỗ; N≥3 cùng hạng mini-bracket)
+- **Playoff tự động** — Cấu hình a (tranh giải) / b (tranh hạng) mỗi bảng; khi vòng bảng xong tự sinh bracket từ BXH (cross-seed, tranh hạng 2 bảng theo funnel; N≥3 cùng hạng mini-bracket)
 
 ---
 
@@ -128,7 +128,7 @@ events (collection)
 2. Trong **Vòng loại trực tiếp**: chọn **a** (suất tranh giải/bảng) và **b** (suất tranh hạng/bảng) → **Lưu cấu hình**.
 3. Khi mọi trận vòng bảng có kết quả → bracket tự tạo (hoặc bấm **Tạo bracket từ BXH**).
 4. Nhập kết quả playoff → đội thắng/thua tự vào trận tiếp theo.
-5. Ví dụ 2 bảng × 5 cặp, a=2, b=3: BK A1–B2 / B1–A2 → CK + 3–4; tranh hạng A3–B3 → 5–6, A4–B4 → 7–8, A5–B5 → 9–10.
+5. Ví dụ 2 bảng × 5 cặp, a=2, b=3: BK A1–B2 / B1–A2 → CK + 3–4; tranh hạng A3–B3… rồi W/L → 5–6, 7–8, 9–10.
 6. Khi có trận quyết định chỗ (Chung kết, Tranh hạng X–Y), **Bảng xếp hạng cuối** hiện hạng 1 → hết (cập nhật dần, đủ khi mọi trận tranh hạng xong).
 
 ---

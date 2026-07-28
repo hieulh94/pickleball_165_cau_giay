@@ -7,12 +7,9 @@ import {
   setDoc,
   type Unsubscribe,
 } from 'firebase/firestore'
-import type { Match, PickleballEvent } from '../types'
+import type { Match, Participant, PickleballEvent } from '../types'
+import { migrateSkillLevel } from './clubPlayers'
 import { getDb } from './firebase'
-import {
-  migrateLegacyTwoGroupPlacementMatches,
-  needsLegacyTwoGroupPlacementMigration,
-} from './playoffBracket'
 
 const EVENTS_COLLECTION = 'events'
 
@@ -67,13 +64,24 @@ function migrateEvent(raw: Record<string, unknown>): PickleballEvent {
     }
   }
 
-  if (Array.isArray(event.matches)) {
-    event.matches = migrateLegacyTwoGroupPlacementMatches(
-      event.matches.map((match) => migrateMatch(match)),
+  if (Array.isArray(event.participants)) {
+    event.participants = event.participants.map((participant) =>
+      migrateParticipantSkill(participant),
     )
   }
 
+  if (Array.isArray(event.matches)) {
+    event.matches = event.matches.map((match) => migrateMatch(match))
+  }
+
   return event
+}
+
+function migrateParticipantSkill(participant: Participant): Participant {
+  return {
+    ...participant,
+    skillLevel: migrateSkillLevel(participant.skillLevel),
+  }
 }
 
 function migrateMatch(match: Match): Match {
@@ -144,14 +152,7 @@ export function subscribeEvent(
         onData(null)
         return
       }
-      const raw = snapshot.data() as Record<string, unknown>
-      const event = docToEvent(snapshot.id, raw)
-      onData(event)
-
-      // Một lần: A3 vs B3… → Tranh hạng 5-6… (giữ điểm), xóa trận W/L thừa
-      if (needsLegacyTwoGroupPlacementMigration(raw.matches as Match[] | undefined)) {
-        void upsertEvent(event)
-      }
+      onData(docToEvent(snapshot.id, snapshot.data() as Record<string, unknown>))
     },
     (error) => onError?.(error),
   )

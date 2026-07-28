@@ -9,7 +9,7 @@ export type WeekStatus = 'current' | 'next' | 'completed' | 'upcoming'
 const LIVE_WINDOW_MS = 3 * 60 * 60 * 1000
 
 export function stripSkillLevel(label: string): string {
-  return label.replace(/\s*\([12]\)/g, '')
+  return label.replace(/\s*\((?:Nam|Nữ|Khác)\s+[12AB]\)/gi, '').replace(/\s*\([12]\)/g, '')
 }
 
 export function formatTeamLabel(pairLabel: string): string {

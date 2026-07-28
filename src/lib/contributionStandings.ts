@@ -1,6 +1,7 @@
+import { resolveCanonicalPlayerName } from './clubPlayers'
 import { isShowMatch } from './matches'
 import { formatParticipantName, normalizeParticipantName } from './showmatchParticipants'
-import type { PickleballEvent } from '../types'
+import type { PickleballEvent, SkillLevel } from '../types'
 
 export type LeaderboardSource = 'tournament' | 'showmatch'
 
@@ -11,6 +12,10 @@ export interface ContributionStanding {
   eventsContributed: number
   matchesPlayed: number
   wins: number
+  /** Elo — chỉ dùng khi metric = rating */
+  rating?: number
+  /** Hạng A/B — kèm Elo */
+  skillLevel?: SkillLevel
 }
 
 interface PlayerContribution {
@@ -108,12 +113,13 @@ function ensurePlayer(
   stats: Map<string, PlayerContribution>,
   rawName: string,
 ): PlayerContribution {
-  const key = normalizeParticipantName(rawName)
+  const canonical = resolveCanonicalPlayerName(rawName)
+  const key = normalizeParticipantName(canonical)
   const existing = stats.get(key)
   if (existing) return existing
 
   const created: PlayerContribution = {
-    displayName: formatParticipantName(rawName),
+    displayName: formatParticipantName(canonical),
     totalAmount: 0,
     contributionEventIds: new Set(),
     contributionMatchIds: new Set(),
@@ -182,7 +188,7 @@ export function getPlayerContributionHistory(
   playerName: string,
   source: LeaderboardSource = 'tournament',
 ): ContributionHistoryEntry[] {
-  const key = normalizeParticipantName(playerName)
+  const key = normalizeParticipantName(resolveCanonicalPlayerName(playerName))
   const entries: ContributionHistoryEntry[] = []
 
   for (const event of events) {
@@ -192,7 +198,7 @@ export function getPlayerContributionHistory(
       if (!contributions) continue
 
       const participant = event.participants.find(
-        (p) => normalizeParticipantName(p.name) === key,
+        (p) => normalizeParticipantName(resolveCanonicalPlayerName(p.name)) === key,
       )
       if (!participant) continue
 
@@ -216,7 +222,7 @@ export function getPlayerContributionHistory(
       if (!contributions) continue
 
       const participant = event.participants.find(
-        (p) => normalizeParticipantName(p.name) === key,
+        (p) => normalizeParticipantName(resolveCanonicalPlayerName(p.name)) === key,
       )
       if (!participant) continue
 
