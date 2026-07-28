@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EloHistoryDialog } from './EloHistoryDialog'
 import { MemberEditDialog, MemberGenderBadge } from './MemberEditDialog'
@@ -26,13 +26,16 @@ import {
   type MembersAccessLevel,
 } from '../lib/membersAccess'
 import {
+  ELO_DEMOTE_THRESHOLD,
+  ELO_MIN_MATCHES_FOR_SKILL_CHANGE,
+  ELO_PROMOTE_THRESHOLD,
   getPlayerEloHistory,
   recomputeClubRatingsFromEvents,
   type EloHistoryEntry,
 } from '../lib/playerRating'
 import { normalizeParticipantName } from '../lib/showmatchParticipants'
-import { fetchAllEvents } from '../lib/storage'
-import type { SkillLevel } from '../types'
+import { subscribeEvents } from '../lib/storage'
+import type { PickleballEvent, SkillLevel } from '../types'
 
 type GenderFilter = 'all' | ClubPlayerGender
 
@@ -83,7 +86,8 @@ function MembersUnlockGate({
           </div>
           <h2 className="mt-4 text-lg font-semibold text-text-primary">Danh sách thành viên</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Nhập mật khẩu CLB để quản lý, hoặc nhập <span className="font-semibold text-text-primary">0</span> để chỉ xem.
+            Nhập mật khẩu CLB để quản lý. Nhập <span className="font-semibold text-text-primary">0</span> để
+            chỉ xem danh sách và chi tiết Elo (không sửa được).
           </p>
         </div>
 
@@ -123,6 +127,21 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   const [eloTarget, setEloTarget] = useState<ClubPlayer | null>(null)
   const [eloHistory, setEloHistory] = useState<EloHistoryEntry[]>([])
   const [eloLoading, setEloLoading] = useState(false)
+  const [events, setEvents] = useState<PickleballEvent[]>([])
+  const [eventsReady, setEventsReady] = useState(!isFirebaseConfigured())
+  const eloCacheRef = useRef(new Map<string, EloHistoryEntry[]>())
+
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return
+    return subscribeEvents(
+      (data) => {
+        setEvents(data)
+        setEventsReady(true)
+        eloCacheRef.current.clear()
+      },
+      () => setEventsReady(true),
+    )
+  }, [])
 
   const filteredPlayers = useMemo(() => {
     const normalized = normalizeParticipantName(search)
@@ -168,10 +187,13 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
       setSyncMessage('Chưa cấu hình Firebase — không tải được lịch sử event.')
       return
     }
+    if (!eventsReady) {
+      setSyncMessage('Đang tải dữ liệu event — thử lại sau giây lát.')
+      return
+    }
     setSyncing(true)
     setSyncMessage(null)
     try {
-      const events = await fetchAllEvents()
       const { updated, rows } = recomputeClubRatingsFromEvents(events)
       setSyncMessage(
         updated > 0
@@ -188,24 +210,43 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
     }
   }
 
-  const handleOpenEloHistory = async (player: ClubPlayer) => {
+  const resolveEloHistory = (player: ClubPlayer, eventList: PickleballEvent[]) => {
+    const cacheKey = normalizeParticipantName(player.name)
+    const cached = eloCacheRef.current.get(cacheKey)
+    if (cached) return cached
+    const history = getPlayerEloHistory(eventList, player.name)
+    eloCacheRef.current.set(cacheKey, history)
+    return history
+  }
+
+  const handleOpenEloHistory = (player: ClubPlayer) => {
+    setEloTarget(player)
+
     if (!isFirebaseConfigured()) {
-      setEloTarget(player)
       setEloHistory([])
+      setEloLoading(false)
       return
     }
-    setEloTarget(player)
-    setEloLoading(true)
-    try {
-      const events = await fetchAllEvents()
-      setEloHistory(getPlayerEloHistory(events, player.name))
-    } catch (err) {
-      console.error(err)
+
+    if (!eventsReady) {
       setEloHistory([])
-    } finally {
-      setEloLoading(false)
+      setEloLoading(true)
+      return
     }
+
+    // Dùng events đã subscribe sẵn — không fetch Firestore mỗi lần click.
+    setEloHistory(resolveEloHistory(player, events))
+    setEloLoading(false)
   }
+
+  // Mở Elo trước khi snapshot Firebase về → điền khi sẵn sàng.
+  useEffect(() => {
+    if (!eloTarget || !eloLoading || !eventsReady || !isFirebaseConfigured()) return
+    setEloHistory(resolveEloHistory(eloTarget, events))
+    setEloLoading(false)
+    // resolveEloHistory đọc ref cache; chỉ phụ thuộc data/target.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [eloTarget, eloLoading, eventsReady, events])
 
   return (
     <section className="space-y-4">
@@ -214,7 +255,7 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
           <SectionLabel>Thành viên CLB</SectionLabel>
           <p className="mt-1 text-sm text-text-secondary">
             {players.length} thành viên · điểm Elo từ mini game · trình độ Nam/Nữ × A–B
-            {!canEdit ? ' · chỉ xem' : ''}
+            {!canEdit ? ' · chỉ xem (vẫn xem được Elo)' : ''}
           </p>
         </div>
         {canEdit && (
@@ -229,6 +270,14 @@ function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
           </Button>
         )}
       </div>
+
+      <p className="rounded-xl border border-primary-100 bg-primary-50/70 px-3.5 py-2.5 text-sm leading-relaxed text-primary-900/80">
+        <span className="font-semibold text-primary-900">Cách tính Elo:</span> cộng/trừ sau mỗi trận
+        mini game (không tính showmatch) — thắng đối thủ mạnh được nhiều điểm hơn. Ban đầu A ≈ 1100,
+        B ≈ 900. Đủ {ELO_MIN_MATCHES_FOR_SKILL_CHANGE} trận: Elo ≥ {ELO_PROMOTE_THRESHOLD} lên A, ≤{' '}
+        {ELO_DEMOTE_THRESHOLD} xuống B.
+      </p>
+
       {syncMessage && (
         <p className="text-sm text-neutral-600">{syncMessage}</p>
       )}
