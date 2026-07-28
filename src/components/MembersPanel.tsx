@@ -20,9 +20,10 @@ import {
 import { cn } from '../lib/cn'
 import { isFirebaseConfigured } from '../lib/firebase'
 import {
+  getMembersAccessLevel,
   grantMembersAccess,
-  isMembersAccessGranted,
   verifyMembersPassword,
+  type MembersAccessLevel,
 } from '../lib/membersAccess'
 import {
   getPlayerEloHistory,
@@ -55,17 +56,22 @@ function LockIcon() {
   )
 }
 
-function MembersUnlockGate({ onUnlock }: { onUnlock: () => void }) {
+function MembersUnlockGate({
+  onUnlock,
+}: {
+  onUnlock: (level: MembersAccessLevel) => void
+}) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = () => {
-    if (!verifyMembersPassword(password)) {
+    const level = verifyMembersPassword(password)
+    if (!level) {
       setError('Mật khẩu không đúng.')
       return
     }
-    grantMembersAccess()
-    onUnlock()
+    grantMembersAccess(level)
+    onUnlock(level)
   }
 
   return (
@@ -77,7 +83,7 @@ function MembersUnlockGate({ onUnlock }: { onUnlock: () => void }) {
           </div>
           <h2 className="mt-4 text-lg font-semibold text-text-primary">Danh sách thành viên</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Nhập mật khẩu CLB để xem và quản lý thành viên.
+            Nhập mật khẩu CLB để quản lý, hoặc nhập <span className="font-semibold text-text-primary">0</span> để chỉ xem.
           </p>
         </div>
 
@@ -96,14 +102,14 @@ function MembersUnlockGate({ onUnlock }: { onUnlock: () => void }) {
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
         <Button className="mt-6 w-full" onClick={handleSubmit}>
-          Xem danh sách
+          Vào danh sách
         </Button>
       </div>
     </section>
   )
 }
 
-function MembersPanelContent() {
+function MembersPanelContent({ canEdit }: { canEdit: boolean }) {
   const { players, add, update, remove } = useClubPlayers()
   const [search, setSearch] = useState('')
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('all')
@@ -208,51 +214,58 @@ function MembersPanelContent() {
           <SectionLabel>Thành viên CLB</SectionLabel>
           <p className="mt-1 text-sm text-text-secondary">
             {players.length} thành viên · điểm Elo từ mini game · trình độ Nam/Nữ × A–B
+            {!canEdit ? ' · chỉ xem' : ''}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleSyncRatings}
-          disabled={syncing}
-          className="shrink-0"
-        >
-          {syncing ? 'Đang đồng bộ…' : 'Đồng bộ điểm từ event'}
-        </Button>
+        {canEdit && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleSyncRatings}
+            disabled={syncing}
+            className="shrink-0"
+          >
+            {syncing ? 'Đang đồng bộ…' : 'Đồng bộ điểm từ event'}
+          </Button>
+        )}
       </div>
       {syncMessage && (
         <p className="text-sm text-neutral-600">{syncMessage}</p>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <input
-          type="text"
-          value={newName}
-          onChange={(e) => {
-            setNewName(e.target.value)
-            if (error) setError(null)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleAdd()
-          }}
-          placeholder="Tên thành viên mới..."
-          className="h-10 flex-1 rounded-lg border border-neutral-200 px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
-        />
-        <select
-          value={newGender}
-          onChange={(e) => setNewGender(e.target.value as ClubPlayerGender)}
-          className={`h-10 shrink-0 ${selectClassName}`}
-          aria-label="Giới tính"
-        >
-          <option value="male">Nam</option>
-          <option value="female">Nữ</option>
-          <option value="other">Khác</option>
-        </select>
-        <Button onClick={handleAdd} className="shrink-0 sm:w-auto">
-          + Thêm
-        </Button>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {canEdit && (
+        <>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => {
+                setNewName(e.target.value)
+                if (error) setError(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd()
+              }}
+              placeholder="Tên thành viên mới..."
+              className="h-10 flex-1 rounded-lg border border-neutral-200 px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+            />
+            <select
+              value={newGender}
+              onChange={(e) => setNewGender(e.target.value as ClubPlayerGender)}
+              className={`h-10 shrink-0 ${selectClassName}`}
+              aria-label="Giới tính"
+            >
+              <option value="male">Nam</option>
+              <option value="female">Nữ</option>
+              <option value="other">Khác</option>
+            </select>
+            <Button onClick={handleAdd} className="shrink-0 sm:w-auto">
+              + Thêm
+            </Button>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </>
+      )}
 
       <SearchInput value={search} onChange={setSearch} placeholder="Tìm thành viên..." />
 
@@ -328,33 +341,52 @@ function MembersPanelContent() {
                 >
                   Elo
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setEditTarget(player)}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-50"
-                >
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget({ id: player.id, name: player.name })}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                  aria-label={`Xóa ${player.name}`}
-                >
-                  Xóa
-                </button>
+                {canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditTarget(player)}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-50"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget({ id: player.id, name: player.name })}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      aria-label={`Xóa ${player.name}`}
+                    >
+                      Xóa
+                    </button>
+                  </>
+                )}
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      <MemberEditDialog
-        open={editTarget !== null}
-        player={editTarget}
-        onClose={() => setEditTarget(null)}
-        onSave={handleSaveEdit}
-      />
+      {canEdit && (
+        <>
+          <MemberEditDialog
+            open={editTarget !== null}
+            player={editTarget}
+            onClose={() => setEditTarget(null)}
+            onSave={handleSaveEdit}
+          />
+
+          <ConfirmDialog
+            open={deleteTarget !== null}
+            title="Xóa thành viên"
+            message={`Bạn có chắc muốn xóa "${deleteTarget?.name ?? ''}" khỏi danh sách CLB?`}
+            confirmLabel="Xóa"
+            confirmVariant="danger"
+            cancelLabel="Hủy"
+            onConfirm={handleConfirmDelete}
+            onCancel={() => setDeleteTarget(null)}
+          />
+        </>
+      )}
 
       <EloHistoryDialog
         open={eloTarget !== null}
@@ -368,27 +400,18 @@ function MembersPanelContent() {
           setEloHistory([])
         }}
       />
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        title="Xóa thành viên"
-        message={`Bạn có chắc muốn xóa "${deleteTarget?.name ?? ''}" khỏi danh sách CLB?`}
-        confirmLabel="Xóa"
-        confirmVariant="danger"
-        cancelLabel="Hủy"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
     </section>
   )
 }
 
 export function MembersPanel() {
-  const [unlocked, setUnlocked] = useState(() => isMembersAccessGranted())
+  const [accessLevel, setAccessLevel] = useState<MembersAccessLevel | null>(() =>
+    getMembersAccessLevel(),
+  )
 
-  if (!unlocked) {
-    return <MembersUnlockGate onUnlock={() => setUnlocked(true)} />
+  if (!accessLevel) {
+    return <MembersUnlockGate onUnlock={setAccessLevel} />
   }
 
-  return <MembersPanelContent />
+  return <MembersPanelContent canEdit={accessLevel === 'edit'} />
 }
