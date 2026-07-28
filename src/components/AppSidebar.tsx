@@ -1,10 +1,11 @@
+import { Link } from 'react-router-dom'
 import { cn } from '../lib/cn'
+import { getTabPath, type NavTab } from '../lib/navTabs'
 
-export type NavTab = 'overview' | 'matches' | 'leaderboard' | 'members' | 'settings'
+export type { NavTab }
 
 interface AppSidebarProps {
   activeTab: NavTab
-  onTabChange: (tab: NavTab) => void
 }
 
 function HomeIcon() {
@@ -62,17 +63,16 @@ const NAV_ITEMS: {
   { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon },
 ]
 
-export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
+export function AppSidebar({ activeTab }: AppSidebarProps) {
   return (
     <aside className="hidden w-[180px] shrink-0 flex-col border-r border-border bg-card lg:flex">
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const active = id === activeTab
           return (
-            <button
+            <Link
               key={id}
-              type="button"
-              onClick={() => onTabChange(id)}
+              to={getTabPath(id)}
               className={cn(
                 'relative flex items-center gap-2.5 rounded-lg py-2 pl-2.5 pr-2 text-[13px] font-medium transition duration-200',
                 active
@@ -85,7 +85,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               )}
               <Icon />
               {label}
-            </button>
+            </Link>
           )
         })}
       </nav>

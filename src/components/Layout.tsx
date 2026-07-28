@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { AppBottomNav } from './AppBottomNav'
 import { AppSidebar, type NavTab } from './AppSidebar'
 import { ContributionLeaderboardPanel } from './ContributionLeaderboardPanel'
 import { Button } from './ui/Button'
 import { computeDashboardStats } from '../lib/dashboardStats'
 import { isFirebaseConfigured } from '../lib/firebase'
+import { getTabFromPath } from '../lib/navTabs'
 import { subscribeEvents } from '../lib/storage'
 import type { PickleballEvent } from '../types'
 
@@ -16,19 +17,10 @@ export type LayoutOutletContext = {
 
 export function Layout() {
   const location = useLocation()
-  const navigate = useNavigate()
-  const isHome = location.pathname === '/'
   const isEventDetail = location.pathname.startsWith('/event/')
+  const activeTab = getTabFromPath(location.pathname) ?? 'overview'
   const [createRequest, setCreateRequest] = useState(0)
-  const [activeTab, setActiveTab] = useState<NavTab>('overview')
   const [eventList, setEventList] = useState<PickleballEvent[]>([])
-
-  const handleTabChange = (tab: NavTab) => {
-    setActiveTab(tab)
-    if (location.pathname !== '/') {
-      navigate('/')
-    }
-  }
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return
@@ -37,19 +29,14 @@ export function Layout() {
 
   const stats = useMemo(() => computeDashboardStats(eventList), [eventList])
   const showHeaderStats =
-    isHome && activeTab === 'overview' && !isEventDetail && isFirebaseConfigured()
-  const showCreateButton = isHome && activeTab === 'matches' && !isEventDetail
-
-  const isHomeTab =
-    activeTab === 'overview' ||
-    activeTab === 'matches' ||
-    activeTab === 'members' ||
-    activeTab === 'settings'
-  const isLeaderboardTab = activeTab === 'leaderboard' && !isEventDetail
+    !isEventDetail && activeTab === 'overview' && isFirebaseConfigured()
+  const showCreateButton = !isEventDetail && activeTab === 'matches'
+  const isLeaderboardTab = !isEventDetail && activeTab === 'leaderboard'
+  const showHomeOutlet = isEventDetail || !isLeaderboardTab
 
   return (
     <div className="flex min-h-dvh bg-surface pb-16 landscape-short:pb-11 lg:min-h-screen lg:pb-0">
-      <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
+      <AppSidebar activeTab={activeTab} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {!isEventDetail && (
@@ -60,7 +47,6 @@ export function Layout() {
                 <Link
                   to="/"
                   className="flex min-w-0 items-center gap-2.5 justify-self-start sm:gap-3"
-                  onClick={() => handleTabChange('overview')}
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-xs font-bold text-white shadow-sm">
                     P
@@ -89,7 +75,6 @@ export function Layout() {
                 <Link
                   to="/"
                   className="flex min-w-0 items-center gap-2.5 sm:gap-3"
-                  onClick={() => handleTabChange('overview')}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white shadow-sm landscape-short:h-8 landscape-short:w-8 landscape-short:text-xs">
                     P
@@ -124,7 +109,7 @@ export function Layout() {
         </header>
         )}
 
-        {isHomeTab ? (
+        {showHomeOutlet ? (
           <main
             className={`mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8 landscape-short:px-3 ${
               isEventDetail ? 'flex flex-col landscape-short:py-1' : 'py-6 sm:py-8 landscape-short:py-3'
@@ -137,7 +122,7 @@ export function Layout() {
         )}
       </div>
 
-      <AppBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      <AppBottomNav activeTab={activeTab} />
     </div>
   )
 }

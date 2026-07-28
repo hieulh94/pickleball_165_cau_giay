@@ -1,8 +1,9 @@
+import { Link } from 'react-router-dom'
 import type { NavTab } from './AppSidebar'
+import { getTabPath } from '../lib/navTabs'
 
 interface AppBottomNavProps {
   activeTab: NavTab
-  onTabChange: (tab: NavTab) => void
 }
 
 function OverviewIcon() {
@@ -16,8 +17,8 @@ function OverviewIcon() {
 function CalendarIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M16 3v4M8 3v4M3 11h18" />
     </svg>
   )
 }
@@ -35,6 +36,7 @@ function UsersIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
       <path d="M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+      <path d="M20 19v-1a3 3 0 0 0-2-2.83M16 3.13a3 3 0 0 1 0 5.74" />
     </svg>
   )
 }
@@ -56,24 +58,23 @@ const TABS: { id: NavTab; label: string; Icon: typeof OverviewIcon }[] = [
   { id: 'settings', label: 'Cài đặt', Icon: SettingsIcon },
 ]
 
-export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
+export function AppBottomNav({ activeTab }: AppBottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(15,23,42,0.04)] landscape-short:shadow-none lg:hidden">
       <div className="mx-auto grid max-w-7xl grid-cols-5 landscape-short:grid-cols-5">
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id
           return (
-            <button
+            <Link
               key={id}
-              type="button"
-              onClick={() => onTabChange(id)}
+              to={getTabPath(id)}
               className={`flex flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-semibold uppercase tracking-wide transition landscape-short:flex-row landscape-short:justify-center landscape-short:gap-1.5 landscape-short:py-1.5 landscape-short:text-[9px] landscape-short:[&_svg]:h-5 landscape-short:[&_svg]:w-5 ${
                 active ? 'text-primary-600' : 'text-neutral-400 hover:text-neutral-600'
               }`}
             >
               <Icon />
               <span className="landscape-short:truncate">{label}</span>
-            </button>
+            </Link>
           )
         })}
       </div>
