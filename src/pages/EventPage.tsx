@@ -15,6 +15,10 @@ import {
 import { SkillLevelBadge } from '../components/SkillLevelBadge'
 import { PairGroupSelect } from '../components/PairGroupSelect'
 import { PairScheduleDialog } from '../components/PairScheduleDialog'
+import {
+  QuickGroupResultsDialog,
+  type QuickGroupResultEntry,
+} from '../components/QuickGroupResultsDialog'
 import { ResultDialog } from '../components/ResultDialog'
 import {
   allPairsAssignedToGroups,
@@ -45,6 +49,7 @@ import {
 } from '../lib/setupLocks'
 import { getPairColor, pairCardClassName } from '../lib/pairColors'
 import { getPairScheduleEntries } from '../lib/pairSchedule'
+import { exportGroupScheduleExcel } from '../lib/exportScheduleExcel'
 import { generateSchedule } from '../lib/schedule'
 import {
   loadSectionVisibility,
@@ -66,7 +71,12 @@ import {
   buildPlayoffMatches,
   canRegeneratePlayoff,
   isGroupStageComplete,
+  isChampionshipPlayoffMatch,
+  isPlacementPlayoffMatch,
+  removePlayoffMatch,
   stripAutoPlayoffMatches,
+  stripChampionshipPlayoffMatches,
+  stripPlacementPlayoffMatches,
   validatePlayoffConfig,
 } from '../lib/playoffBracket'
 import {
@@ -170,6 +180,7 @@ export function EventPage() {
   const [isEditingEventName, setIsEditingEventName] = useState(false)
   const [eventNameInput, setEventNameInput] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+  const [quickGroupResultsOpen, setQuickGroupResultsOpen] = useState(false)
   const [participantToDelete, setParticipantToDelete] = useState<string | null>(null)
   const [matchToDelete, setMatchToDelete] = useState<string | null>(null)
   const [showRandomPairsConfirm, setShowRandomPairsConfirm] = useState(false)
@@ -1232,6 +1243,60 @@ export function EventPage() {
     setMatchToDelete(matchId)
   }
 
+  const handleClearChampionship = () => {
+    if (
+      !confirm(
+        'Xóa toàn bộ nhánh tranh giải? Bạn có thể tạo lại thủ công hoặc bấm tạo bracket.',
+      )
+    ) {
+      return
+    }
+    const matches = stripChampionshipPlayoffMatches(event.matches)
+    const stillHasAuto = matches.some(
+      (m) => m.playoffBracket === 'championship' || m.playoffBracket === 'placement',
+    )
+    persist({
+      ...event,
+      matches,
+      playoffConfig: event.playoffConfig
+        ? {
+            ...event.playoffConfig,
+            status: stillHasAuto ? event.playoffConfig.status : 'configured',
+          }
+        : event.playoffConfig,
+    })
+    if (selectedMatch && isChampionshipPlayoffMatch(selectedMatch)) {
+      setSelectedMatch(null)
+    }
+  }
+
+  const handleClearPlacement = () => {
+    if (
+      !confirm(
+        'Xóa toàn bộ nhánh tranh hạng? Bạn có thể tạo lại thủ công hoặc bấm tạo bracket.',
+      )
+    ) {
+      return
+    }
+    const matches = stripPlacementPlayoffMatches(event.matches)
+    const stillHasAuto = matches.some(
+      (m) => m.playoffBracket === 'championship' || m.playoffBracket === 'placement',
+    )
+    persist({
+      ...event,
+      matches,
+      playoffConfig: event.playoffConfig
+        ? {
+            ...event.playoffConfig,
+            status: stillHasAuto ? event.playoffConfig.status : 'configured',
+          }
+        : event.playoffConfig,
+    })
+    if (selectedMatch && isPlacementPlayoffMatch(selectedMatch)) {
+      setSelectedMatch(null)
+    }
+  }
+
   const confirmDeleteMatch = () => {
     if (!matchToDelete) return
     const pendingDelete = event.matches.find((m) => m.id === matchToDelete)
@@ -1240,10 +1305,28 @@ export function EventPage() {
       setMatchToDelete(null)
       return
     }
-    persist({
-      ...event,
-      matches: event.matches.filter((m) => m.id !== matchToDelete),
-    })
+
+    const matches =
+      pendingDelete && isPlayoffMatch(pendingDelete)
+        ? removePlayoffMatch(event.matches, matchToDelete)
+        : event.matches.filter((m) => m.id !== matchToDelete)
+
+    const stillHasAuto = matches.some(
+      (m) => m.playoffBracket === 'championship' || m.playoffBracket === 'placement',
+    )
+    const deletedAutoBracket =
+      pendingDelete &&
+      (isChampionshipPlayoffMatch(pendingDelete) ||
+        isPlacementPlayoffMatch(pendingDelete))
+    const playoffConfig =
+      deletedAutoBracket && event.playoffConfig
+        ? {
+            ...event.playoffConfig,
+            status: stillHasAuto ? event.playoffConfig.status : 'configured',
+          }
+        : event.playoffConfig
+
+    persist({ ...event, matches, playoffConfig })
     setMatchToDelete(null)
     if (selectedMatch?.id === matchToDelete) setSelectedMatch(null)
   }
@@ -1293,6 +1376,44 @@ export function EventPage() {
     })
   }
 
+  const maybeRegeneratePlayoff = (
+    matches: Match[],
+    playoffConfig: PickleballEvent['playoffConfig'],
+  ): { matches: Match[]; playoffConfig: PickleballEvent['playoffConfig'] } => {
+    const nextGroupMatches = filterGroupMatches(matches)
+    if (
+      !playoffConfig ||
+      !isGroupStageComplete(nextGroupMatches) ||
+      !canRegeneratePlayoff(matches)
+    ) {
+      return { matches, playoffConfig }
+    }
+
+    const nextStandings = calculateStandings(
+      event.pairs,
+      nextGroupMatches,
+      event.splitGroups,
+    )
+    const error = validatePlayoffConfig(
+      nextStandings,
+      event.splitGroups,
+      playoffConfig,
+    )
+    if (error) return { matches, playoffConfig }
+
+    const autoMatches = buildPlayoffMatches(
+      nextStandings,
+      playoffConfig,
+      event.courts,
+    )
+    if (autoMatches.length === 0) return { matches, playoffConfig }
+
+    return {
+      matches: [...stripAutoPlayoffMatches(matches), ...autoMatches],
+      playoffConfig: { ...playoffConfig, status: 'generated' },
+    }
+  }
+
   const handleUpdateResult = (matchId: string, score1: number, score2: number) => {
     const prev = event.matches.find((m) => m.id === matchId)
     if (!prev) return
@@ -1307,38 +1428,37 @@ export function EventPage() {
     }
 
     let playoffConfig = event.playoffConfig
-    const nextGroupMatches = filterGroupMatches(matches)
-
-    if (
-      isGroupMatch(prev) &&
-      playoffConfig &&
-      isGroupStageComplete(nextGroupMatches) &&
-      canRegeneratePlayoff(matches)
-    ) {
-      const nextStandings = calculateStandings(
-        event.pairs,
-        nextGroupMatches,
-        event.splitGroups,
-      )
-      const error = validatePlayoffConfig(
-        nextStandings,
-        event.splitGroups,
-        playoffConfig,
-      )
-      if (!error) {
-        const autoMatches = buildPlayoffMatches(
-          nextStandings,
-          playoffConfig,
-          event.courts,
-        )
-        if (autoMatches.length > 0) {
-          matches = [...stripAutoPlayoffMatches(matches), ...autoMatches]
-          playoffConfig = { ...playoffConfig, status: 'generated' }
-        }
-      }
+    if (isGroupMatch(prev)) {
+      const regenerated = maybeRegeneratePlayoff(matches, playoffConfig)
+      matches = regenerated.matches
+      playoffConfig = regenerated.playoffConfig
     }
 
     persist({ ...event, matches, playoffConfig })
+  }
+
+  const handleBulkUpdateGroupResults = (results: QuickGroupResultEntry[]) => {
+    if (results.length === 0) return
+    const resultMap = new Map(results.map((r) => [r.matchId, r]))
+
+    let matches = event.matches.map((m) => {
+      const result = resultMap.get(m.id)
+      if (!result || !isGroupMatch(m)) return m
+      return {
+        ...m,
+        score1: result.score1,
+        score2: result.score2,
+        completed: true,
+      }
+    })
+
+    const regenerated = maybeRegeneratePlayoff(matches, event.playoffConfig)
+    matches = regenerated.matches
+    persist({
+      ...event,
+      matches,
+      playoffConfig: regenerated.playoffConfig,
+    })
   }
 
   const handleStartEditEventName = () => {
@@ -1835,6 +1955,32 @@ export function EventPage() {
         {groupMatches.length > 0 && (
           <>
             <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  void exportGroupScheduleExcel({
+                    eventName: event.name,
+                    matches: groupMatches,
+                    pairs: event.pairs,
+                    participants: event.participants,
+                  })
+                }
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800 shadow-sm hover:bg-emerald-100"
+              >
+                📥 Xuất Excel lịch
+              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setQuickGroupResultsOpen(true)}
+                  className="rounded-lg border border-primary-300 bg-primary-50 px-4 py-2.5 text-sm font-medium text-primary-800 shadow-sm hover:bg-primary-100"
+                >
+                  ⚡ Điền kết quả nhanh theo bảng
+                </button>
+              )}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
               {event.pairs.map((pair) => {
                 const pairNumber = pairNumberById.get(pair.id) ?? 0
                 const color = getPairColor(pairNumber)
@@ -2054,6 +2200,8 @@ export function EventPage() {
             onGenerateBracket={handleGeneratePlayoffBracket}
             onCreateMatch={handleCreatePlayoffMatch}
             onDeleteMatch={handleDeletePlayoffMatch}
+            onClearChampionship={handleClearChampionship}
+            onClearPlacement={handleClearPlacement}
             onUpdateResult={setSelectedMatch}
           />
         </CollapsibleSection>
@@ -2076,6 +2224,16 @@ export function EventPage() {
         pairLabel={pairScheduleLabel}
         entries={pairScheduleEntries}
         onClose={() => setPairScheduleTarget(null)}
+      />
+
+      <QuickGroupResultsDialog
+        open={quickGroupResultsOpen}
+        matches={groupMatches}
+        pairs={event.pairs}
+        participants={event.participants}
+        pairNumberById={pairNumberById}
+        onClose={() => setQuickGroupResultsOpen(false)}
+        onSave={handleBulkUpdateGroupResults}
       />
 
       <ResultDialog

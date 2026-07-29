@@ -117,10 +117,78 @@ type ChampNode =
   | { kind: 'bye' }
   | { kind: 'match'; matchIndex: number }
 
+function seedNodeAtRank(group: GroupStandings, rank: number): ChampNode | null {
+  const pairId = getPairIdAtRank(group, rank)
+  if (!pairId || !group.group) return null
+  return { kind: 'seed', key: seedKey(group.group, rank), pairId }
+}
+
+function pushSeedMatch(
+  pairings: ChampNode[],
+  group1: GroupStandings,
+  rank1: number,
+  group2: GroupStandings,
+  rank2: number,
+) {
+  const left = seedNodeAtRank(group1, rank1)
+  const right = seedNodeAtRank(group2, rank2)
+  if (!left || !right) return
+  pairings.push(left, right)
+}
+
 /**
- * Vòng 1 tranh giải — rule xoay vòng:
- * A1–B2, B1–C2, C1–A2, … (bảng cuối 1 gặp A2).
- * Nếu a > 2: thêm cùng hạng (N=2: Ar–Br; N≥3: ghép cặp lần lượt).
+ * Vòng 1 hạng 1–2: #1 và #2 cùng bảng nằm hai nửa bracket đối diện
+ * (tránh gặp nhau ngay vòng sau tứ kết).
+ *
+ * N chẵn (VD 4 bảng): A1–B2, C1–D2 | B1–A2, D1–C2
+ * N lẻ: ghép đôi bảng + bye cho bảng lẻ (VD 3 bảng: A1–B2, C1–bye | B1–A2, C2–bye)
+ */
+function buildRankOneTwoOppositeHalfPairings(groups: GroupStandings[]): ChampNode[] {
+  const n = groups.length
+  const pairings: ChampNode[] = []
+
+  if (n % 2 === 0) {
+    // Nửa trên: A1–B2, C1–D2, …
+    for (let i = 0; i < n; i += 2) {
+      pushSeedMatch(pairings, groups[i], 1, groups[i + 1], 2)
+    }
+    // Nửa dưới: B1–A2, D1–C2, …
+    for (let i = 0; i < n; i += 2) {
+      pushSeedMatch(pairings, groups[i + 1], 1, groups[i], 2)
+    }
+    return pairings
+  }
+
+  // N lẻ: ghép từng cặp bảng; bảng cuối nhận bye ở cả hai nửa
+  for (let i = 0; i + 1 < n; i += 2) {
+    pushSeedMatch(pairings, groups[i], 1, groups[i + 1], 2)
+  }
+  {
+    const last = groups[n - 1]
+    const node = seedNodeAtRank(last, 1)
+    if (node) {
+      pairings.push(node)
+      pairings.push({ kind: 'bye' })
+    }
+  }
+  for (let i = 0; i + 1 < n; i += 2) {
+    pushSeedMatch(pairings, groups[i + 1], 1, groups[i], 2)
+  }
+  {
+    const last = groups[n - 1]
+    const node = seedNodeAtRank(last, 2)
+    if (node) {
+      pairings.push(node)
+      pairings.push({ kind: 'bye' })
+    }
+  }
+  return pairings
+}
+
+/**
+ * Vòng 1 tranh giải:
+ * a≥2 → #1/#2 cùng bảng ở hai nửa đối diện (A1–B2, C1–D2 | B1–A2, D1–C2…).
+ * a>2 → thêm cùng hạng (N=2: Ar–Br; N≥3: ghép cặp lần lượt).
  */
 function buildChampionshipFirstRoundSeeds(
   groups: GroupStandings[],
@@ -133,58 +201,30 @@ function buildChampionshipFirstRoundSeeds(
 
   if (a === 1) {
     for (const g of groups) {
-      const pairId = getPairIdAtRank(g, 1)
-      if (pairId && g.group) {
-        pairings.push({ kind: 'seed', key: seedKey(g.group, 1), pairId })
-      }
+      const node = seedNodeAtRank(g, 1)
+      if (node) pairings.push(node)
     }
     return pairings
   }
 
-  // a >= 2: cyclic G[i]_1 vs G[(i+1)%n]_2
-  for (let i = 0; i < n; i++) {
-    const gHome = groups[i]
-    const gAway = groups[(i + 1) % n]
-    const p1 = getPairIdAtRank(gHome, 1)
-    const p2 = getPairIdAtRank(gAway, 2)
-    if (!p1 || !p2 || !gHome.group || !gAway.group) continue
-    pairings.push(
-      { kind: 'seed', key: seedKey(gHome.group, 1), pairId: p1 },
-      { kind: 'seed', key: seedKey(gAway.group, 2), pairId: p2 },
-    )
-  }
+  pairings.push(...buildRankOneTwoOppositeHalfPairings(groups))
 
   for (let rank = 3; rank <= a; rank++) {
     if (n === 2) {
       const [gA, gB] = groups
-      const p1 = getPairIdAtRank(gA, rank)
-      const p2 = getPairIdAtRank(gB, rank)
-      if (p1 && p2 && gA.group && gB.group) {
-        pairings.push(
-          { kind: 'seed', key: seedKey(gA.group, rank), pairId: p1 },
-          { kind: 'seed', key: seedKey(gB.group, rank), pairId: p2 },
-        )
-      }
+      pushSeedMatch(pairings, gA, rank, gB, rank)
     } else {
       for (let i = 0; i < n; i += 2) {
         const g1 = groups[i]
         if (i + 1 >= n) {
-          const p = getPairIdAtRank(g1, rank)
-          if (p && g1.group) {
-            pairings.push({ kind: 'seed', key: seedKey(g1.group, rank), pairId: p })
+          const node = seedNodeAtRank(g1, rank)
+          if (node) {
+            pairings.push(node)
             pairings.push({ kind: 'bye' })
           }
           break
         }
-        const g2 = groups[i + 1]
-        const p1 = getPairIdAtRank(g1, rank)
-        const p2 = getPairIdAtRank(g2, rank)
-        if (p1 && p2 && g1.group && g2.group) {
-          pairings.push(
-            { kind: 'seed', key: seedKey(g1.group, rank), pairId: p1 },
-            { kind: 'seed', key: seedKey(g2.group, rank), pairId: p2 },
-          )
-        }
+        pushSeedMatch(pairings, g1, rank, groups[i + 1], rank)
       }
     }
   }
@@ -193,7 +233,7 @@ function buildChampionshipFirstRoundSeeds(
 }
 
 /**
- * Bracket tranh giải: vòng 1 theo cyclic A1–B2 / B1–C2 / …,
+ * Bracket tranh giải: vòng 1 tách #1/#2 cùng bảng sang hai nửa,
  * rồi single-elim + tranh 3–4 khi có 2 trận nuôi chung kết.
  */
 function buildChampionshipMatches(
@@ -371,6 +411,11 @@ function buildPlacementTwoGroups(
   const groups = standings.filter((g) => g.group)
   if (groups.length !== 2) return []
 
+  // b === 2: xử lý ở buildPlacementB2Cyclic (A3–B4 / B3–A4)
+  if (b === 2) {
+    return buildPlacementB2Cyclic(standings, a, courts, createId, courtOffset)
+  }
+
   const [gA, gB] = groups
   const matches: Match[] = []
 
@@ -397,7 +442,7 @@ function buildPlacementTwoGroups(
     return matches
   }
 
-  // Round 1: Ar vs Br for r = a+1 .. a+b
+  // b >= 3: Round 1 same rank Ar vs Br
   const r1: Match[] = []
   for (let i = 0; i < b; i++) {
     const rank = a + 1 + i
@@ -426,50 +471,6 @@ function buildPlacementTwoGroups(
 
   const basePlace = 2 * a + 1
 
-  if (b === 2) {
-    // W vs W → higher, L vs L → lower
-    const wwId = createId()
-    const llId = createId()
-    const ww: Match = {
-      id: wwId,
-      pair1Id: null,
-      pair2Id: null,
-      round: 0,
-      court: courtAt(courts, courtOffset.value++),
-      phase: 'playoff',
-      name: `Tranh hạng ${basePlace}-${basePlace + 1}`,
-      completed: false,
-      playoffBracket: 'placement',
-      playoffRound: 2,
-      pair1Source: `W:${r1[0].id}`,
-      pair2Source: `W:${r1[1].id}`,
-    }
-    const ll: Match = {
-      id: llId,
-      pair1Id: null,
-      pair2Id: null,
-      round: 0,
-      court: courtAt(courts, courtOffset.value++),
-      phase: 'playoff',
-      name: `Tranh hạng ${basePlace + 2}-${basePlace + 3}`,
-      completed: false,
-      playoffBracket: 'placement',
-      playoffRound: 2,
-      pair1Source: `L:${r1[0].id}`,
-      pair2Source: `L:${r1[1].id}`,
-    }
-    r1[0].winnerToMatchId = wwId
-    r1[0].winnerToSlot = 1
-    r1[0].loserToMatchId = llId
-    r1[0].loserToSlot = 1
-    r1[1].winnerToMatchId = wwId
-    r1[1].winnerToSlot = 2
-    r1[1].loserToMatchId = llId
-    r1[1].loserToSlot = 2
-    matches.push(ww, ll)
-    return matches
-  }
-
   // b >= 3: PM0 = W0 vs W1; PMi = L(i-1) vs W(i+1); PM(b-1) = L(b-2) vs L(b-1)
   const placeMatches: Match[] = []
   for (let i = 0; i < b; i++) {
@@ -491,8 +492,6 @@ function buildPlacementTwoGroups(
     })
   }
 
-  // Wire R1 → place matches
-  // PM0: W0 vs W1
   placeMatches[0].pair1Source = `W:${r1[0].id}`
   placeMatches[0].pair2Source = `W:${r1[1].id}`
   r1[0].winnerToMatchId = placeMatches[0].id
@@ -501,7 +500,6 @@ function buildPlacementTwoGroups(
   r1[1].winnerToSlot = 2
 
   for (let i = 1; i <= b - 2; i++) {
-    // PMi: L(i-1) vs W(i+1)
     placeMatches[i].pair1Source = `L:${r1[i - 1].id}`
     placeMatches[i].pair2Source = `W:${r1[i + 1].id}`
     r1[i - 1].loserToMatchId = placeMatches[i].id
@@ -510,7 +508,6 @@ function buildPlacementTwoGroups(
     r1[i + 1].winnerToSlot = 2
   }
 
-  // Last: L(b-2) vs L(b-1)
   const last = b - 1
   placeMatches[last].pair1Source = `L:${r1[b - 2].id}`
   placeMatches[last].pair2Source = `L:${r1[b - 1].id}`
@@ -524,7 +521,7 @@ function buildPlacementTwoGroups(
 }
 
 function buildSameRankMiniBracket(
-  teams: { key: string; pairId: string }[],
+  teams: { key: string; pairId: string | null }[],
   placeStart: number,
   courts: number[],
   createId: CreateId,
@@ -553,16 +550,15 @@ function buildSameRankMiniBracket(
     ]
   }
 
-  // Reuse championship-style single elim among these teams for the place block
   const n = teams.length
   const bracketSize = nextPowerOf2(n)
   const seedNumbers = bracketSeedOrder(bracketSize)
-  const slots: ({ key: string; pairId: string } | null)[] = seedNumbers.map((seedNum) =>
-    seedNum <= n ? teams[seedNum - 1] : null,
+  const slots: ({ key: string; pairId: string | null } | null)[] = seedNumbers.map(
+    (seedNum) => (seedNum <= n ? teams[seedNum - 1] : null),
   )
 
   type Node =
-    | { kind: 'seed'; key: string; pairId: string }
+    | { kind: 'seed'; key: string; pairId: string | null }
     | { kind: 'bye' }
     | { kind: 'match'; matchIndex: number }
 
@@ -666,6 +662,158 @@ function buildSameRankMiniBracket(
   return matches
 }
 
+/** Gắn winnerTo/loserTo từ trận R1 vào bracket khi source là W:id / L:id. */
+function wireFeedMatchesToBracket(
+  feedMatches: Match[],
+  bracketMatches: Match[],
+  kind: 'W' | 'L',
+) {
+  const prefix = `${kind}:`
+  for (const bm of bracketMatches) {
+    for (const slot of [1, 2] as const) {
+      const source = slot === 1 ? bm.pair1Source : bm.pair2Source
+      if (!source?.startsWith(prefix)) continue
+      // Chỉ wire từ feed R1, không wire W: của trận trong chính bracket
+      const feedId = source.slice(prefix.length)
+      const feed = feedMatches.find((m) => m.id === feedId)
+      if (!feed) continue
+      if (kind === 'W') {
+        feed.winnerToMatchId = bm.id
+        feed.winnerToSlot = slot
+      } else {
+        feed.loserToMatchId = bm.id
+        feed.loserToSlot = slot
+      }
+    }
+  }
+}
+
+/**
+ * Tranh hạng khi b=2: vòng 1 xoay vòng như rule cũ tranh giải
+ * A(a+1)–B(a+2), B(a+1)–C(a+2), C(a+1)–D(a+2), D(a+1)–A(a+2)…
+ * rồi nhánh thắng / nhánh thua xác định hạng.
+ */
+function buildPlacementB2Cyclic(
+  standings: GroupStandings[],
+  a: number,
+  courts: number[],
+  createId: CreateId,
+  courtOffset: { value: number },
+): Match[] {
+  const groups = standings.filter((g) => g.group)
+  const n = groups.length
+  if (n < 2) return []
+
+  const rankHi = a + 1
+  const rankLo = a + 2
+  const matches: Match[] = []
+  const r1: Match[] = []
+
+  for (let i = 0; i < n; i++) {
+    const gHome = groups[i]
+    const gAway = groups[(i + 1) % n]
+    const p1 = getPairIdAtRank(gHome, rankHi)
+    const p2 = getPairIdAtRank(gAway, rankLo)
+    if (!p1 || !p2 || !gHome.group || !gAway.group) continue
+
+    const m: Match = {
+      id: createId(),
+      pair1Id: p1,
+      pair2Id: p2,
+      round: 0,
+      court: courtAt(courts, courtOffset.value++),
+      phase: 'playoff',
+      name: `${seedKey(gHome.group, rankHi)} vs ${seedKey(gAway.group, rankLo)}`,
+      completed: false,
+      playoffBracket: 'placement',
+      playoffRound: 1,
+      pair1Source: seedKey(gHome.group, rankHi),
+      pair2Source: seedKey(gAway.group, rankLo),
+    }
+    r1.push(m)
+    matches.push(m)
+  }
+
+  if (r1.length < 2) return matches
+
+  const basePlace = n * a + 1
+
+  if (n === 2) {
+    const wwId = createId()
+    const llId = createId()
+    const ww: Match = {
+      id: wwId,
+      pair1Id: null,
+      pair2Id: null,
+      round: 0,
+      court: courtAt(courts, courtOffset.value++),
+      phase: 'playoff',
+      name: `Tranh hạng ${basePlace}-${basePlace + 1}`,
+      completed: false,
+      playoffBracket: 'placement',
+      playoffRound: 2,
+      pair1Source: `W:${r1[0].id}`,
+      pair2Source: `W:${r1[1].id}`,
+    }
+    const ll: Match = {
+      id: llId,
+      pair1Id: null,
+      pair2Id: null,
+      round: 0,
+      court: courtAt(courts, courtOffset.value++),
+      phase: 'playoff',
+      name: `Tranh hạng ${basePlace + 2}-${basePlace + 3}`,
+      completed: false,
+      playoffBracket: 'placement',
+      playoffRound: 2,
+      pair1Source: `L:${r1[0].id}`,
+      pair2Source: `L:${r1[1].id}`,
+    }
+    r1[0].winnerToMatchId = wwId
+    r1[0].winnerToSlot = 1
+    r1[0].loserToMatchId = llId
+    r1[0].loserToSlot = 1
+    r1[1].winnerToMatchId = wwId
+    r1[1].winnerToSlot = 2
+    r1[1].loserToMatchId = llId
+    r1[1].loserToSlot = 2
+    matches.push(ww, ll)
+    return matches
+  }
+
+  const winnerSeeds = r1.map((m) => ({
+    key: `W:${m.id}`,
+    pairId: null as string | null,
+  }))
+  const loserSeeds = r1.map((m) => ({
+    key: `L:${m.id}`,
+    pairId: null as string | null,
+  }))
+
+  const winnerBracket = buildSameRankMiniBracket(
+    winnerSeeds,
+    basePlace,
+    courts,
+    createId,
+    courtOffset,
+    2,
+  )
+  const loserBracket = buildSameRankMiniBracket(
+    loserSeeds,
+    basePlace + n,
+    courts,
+    createId,
+    courtOffset,
+    2,
+  )
+
+  wireFeedMatchesToBracket(r1, winnerBracket, 'W')
+  wireFeedMatchesToBracket(r1, loserBracket, 'L')
+
+  matches.push(...winnerBracket, ...loserBracket)
+  return matches
+}
+
 function buildPlacementNGroups(
   standings: GroupStandings[],
   a: number,
@@ -675,13 +823,19 @@ function buildPlacementNGroups(
   courtOffset: { value: number },
 ): Match[] {
   if (b <= 0) return []
+
+  // b === 2: xoay vòng cross-seed (giống rule cũ tranh giải)
+  if (b === 2) {
+    return buildPlacementB2Cyclic(standings, a, courts, createId, courtOffset)
+  }
+
   const groups = standings.filter((g) => g.group)
   const n = groups.length
   const matches: Match[] = []
 
   for (let i = 0; i < b; i++) {
     const rank = a + 1 + i
-    const teams: { key: string; pairId: string }[] = []
+    const teams: { key: string; pairId: string | null }[] = []
     for (const g of groups) {
       const pairId = getPairIdAtRank(g, rank)
       if (pairId && g.group) {
@@ -723,9 +877,11 @@ export function buildPlayoffMatches(
 
   const groups = standings.filter((g) => g.group)
   const placement =
-    groups.length === 2
-      ? buildPlacementTwoGroups(standings, a, b, courts, createId, courtOffset)
-      : buildPlacementNGroups(standings, a, b, courts, createId, courtOffset)
+    b === 2
+      ? buildPlacementB2Cyclic(standings, a, courts, createId, courtOffset)
+      : groups.length === 2
+        ? buildPlacementTwoGroups(standings, a, b, courts, createId, courtOffset)
+        : buildPlacementNGroups(standings, a, b, courts, createId, courtOffset)
 
   return [...championship, ...placement]
 }
@@ -874,9 +1030,15 @@ export function describePlayoffPreview(
     parts.push(`${placeTeams} đội tranh hạng ${placeStart}–${placeEnd}`)
   }
   if (groupCount >= 2 && a >= 2) {
-    parts.push('Vòng 1 tranh giải: A1–B2, B1–C2, C1–A2… (xoay vòng)')
+    parts.push(
+      'Vòng 1 tranh giải: A1–B2, C1–D2… | B1–A2, D1–C2… (#1/#2 cùng bảng ở hai nửa, tránh gặp sớm)',
+    )
   }
-  if (groupCount === 2 && b >= 3) {
+  if (b === 2 && groupCount >= 2) {
+    parts.push(
+      `Tranh hạng (b=2): A${a + 1}–B${a + 2}, B${a + 1}–C${a + 2}… rồi nhánh thắng/thua`,
+    )
+  } else if (groupCount === 2 && b >= 3) {
     parts.push(
       `Tranh hạng: A${a + 1}–B${a + 1}… rồi W/L → hạng ${2 * a + 1}…`,
     )
@@ -888,6 +1050,74 @@ export function describePlayoffPreview(
 
 export function stripAutoPlayoffMatches(matches: Match[]): Match[] {
   return matches.filter((m) => !isAutoPlayoffMatch(m))
+}
+
+export function isChampionshipPlayoffMatch(match: Match): boolean {
+  return isPlayoffMatch(match) && match.playoffBracket === 'championship'
+}
+
+export function isPlacementPlayoffMatch(match: Match): boolean {
+  return isPlayoffMatch(match) && match.playoffBracket === 'placement'
+}
+
+/** Xóa trận playoff và gỡ winnerTo/loserTo / nguồn W: L: trỏ tới nó. */
+export function removePlayoffMatch(matches: Match[], matchId: string): Match[] {
+  return matches
+    .filter((m) => m.id !== matchId)
+    .map((m) => {
+      let next = m
+      const clearWinnerLink = m.winnerToMatchId === matchId
+      const clearLoserLink = m.loserToMatchId === matchId
+      const clearPair1 =
+        m.pair1Source === `W:${matchId}` || m.pair1Source === `L:${matchId}`
+      const clearPair2 =
+        m.pair2Source === `W:${matchId}` || m.pair2Source === `L:${matchId}`
+
+      if (!clearWinnerLink && !clearLoserLink && !clearPair1 && !clearPair2) {
+        return m
+      }
+
+      next = { ...m }
+      if (clearWinnerLink) {
+        delete next.winnerToMatchId
+        delete next.winnerToSlot
+      }
+      if (clearLoserLink) {
+        delete next.loserToMatchId
+        delete next.loserToSlot
+      }
+      if (clearPair1) {
+        next.pair1Id = null
+        delete next.pair1Source
+      }
+      if (clearPair2) {
+        next.pair2Id = null
+        delete next.pair2Source
+      }
+      return next
+    })
+}
+
+/** Xóa toàn bộ nhánh tranh giải (giữ tranh hạng + trận tay). */
+export function stripChampionshipPlayoffMatches(matches: Match[]): Match[] {
+  const championshipIds = matches
+    .filter(isChampionshipPlayoffMatch)
+    .map((m) => m.id)
+  let next = matches
+  for (const id of championshipIds) {
+    next = removePlayoffMatch(next, id)
+  }
+  return next
+}
+
+/** Xóa toàn bộ nhánh tranh hạng (giữ tranh giải + trận tay). */
+export function stripPlacementPlayoffMatches(matches: Match[]): Match[] {
+  const placementIds = matches.filter(isPlacementPlayoffMatch).map((m) => m.id)
+  let next = matches
+  for (const id of placementIds) {
+    next = removePlayoffMatch(next, id)
+  }
+  return next
 }
 
 export function canRegeneratePlayoff(matches: Match[]): boolean {

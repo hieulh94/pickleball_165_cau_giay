@@ -16,6 +16,8 @@ import {
   describePlayoffPreview,
   expectedFinalPlaceCount,
   isAutoPlayoffMatch,
+  isChampionshipPlayoffMatch,
+  isPlacementPlayoffMatch,
   isFinalRankingComplete,
   isGroupStageComplete,
 } from '../lib/playoffBracket'
@@ -86,6 +88,8 @@ interface PlayoffSectionProps {
     pair2Id: string
   }) => void
   onDeleteMatch: (matchId: string) => void
+  onClearChampionship?: () => void
+  onClearPlacement?: () => void
   onUpdateResult: (match: Match) => void
 }
 
@@ -152,6 +156,12 @@ function MatchCard({
   const pair2Number = match.pair2Id ? (pairNumberById.get(match.pair2Id) ?? 0) : 0
   const canEnterResult = Boolean(match.pair1Id && match.pair2Id)
 
+  const canDelete =
+    !readOnly &&
+    (!isAutoPlayoffMatch(match) ||
+      isChampionshipPlayoffMatch(match) ||
+      isPlacementPlayoffMatch(match))
+
   return (
     <div
       className={`flex flex-col rounded-2xl border p-4 shadow-sm ${
@@ -174,7 +184,7 @@ function MatchCard({
             </span>
           )}
         </div>
-        {!readOnly && !isAutoPlayoffMatch(match) && (
+        {canDelete && (
           <button
             type="button"
             onClick={() => onDeleteMatch(match.id)}
@@ -238,6 +248,8 @@ export function PlayoffSection({
   onGenerateBracket,
   onCreateMatch,
   onDeleteMatch,
+  onClearChampionship,
+  onClearPlacement,
   onUpdateResult,
 }: PlayoffSectionProps) {
   const [name, setName] = useState('')
@@ -439,7 +451,21 @@ export function PlayoffSection({
 
       {championshipMatches.length > 0 && (
         <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-neutral-800">Nhánh tranh giải</h4>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-neutral-800">Nhánh tranh giải</h4>
+            {!readOnly && onClearChampionship && (
+              <button
+                type="button"
+                onClick={onClearChampionship}
+                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+              >
+                Xóa nhánh tranh giải
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-neutral-500">
+            Có thể xóa từng trận hoặc cả nhánh để tạo lại thủ công.
+          </p>
           {groupByRound(championshipMatches).map(([round, roundMatches]) => (
             <div key={`c-${round}`}>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
@@ -466,8 +492,22 @@ export function PlayoffSection({
 
       {placementMatches.length > 0 && (
         <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-neutral-800">Nhánh tranh hạng</h4>
-          {groupCount >= 3 && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-neutral-800">Nhánh tranh hạng</h4>
+            {!readOnly && onClearPlacement && (
+              <button
+                type="button"
+                onClick={onClearPlacement}
+                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+              >
+                Xóa nhánh tranh hạng
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-neutral-500">
+            Có thể xóa từng trận hoặc cả nhánh để tạo lại thủ công.
+          </p>
+          {groupCount >= 3 && slotsB !== 2 && (
             <p className="text-xs text-neutral-500">
               Từ 3 bảng trở lên: mỗi cùng hạng tạo mini nhánh riêng.
             </p>
