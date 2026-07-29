@@ -234,7 +234,7 @@ function buildChampionshipFirstRoundSeeds(
 
 /**
  * Bracket tranh giải: vòng 1 tách #1/#2 cùng bảng sang hai nửa,
- * rồi single-elim + tranh 3–4 khi có 2 trận nuôi chung kết.
+ * rồi single-elim + tranh 3–4 (thua bán kết) + tranh 5–8 (thua tứ kết, khi đủ 8 đội).
  */
 function buildChampionshipMatches(
   standings: GroupStandings[],
@@ -379,6 +379,30 @@ function buildChampionshipMatches(
     if (roundsFromFinal === 1) m.name = 'Bán kết'
     else if (roundsFromFinal === 2) m.name = 'Tứ kết'
     else m.name = championshipRoundName(2 ** (roundsFromFinal + 1), false, 1, 2)
+  }
+
+  // 8 đội trở lên: thua tứ kết → tranh hạng 5–8 (bán kết 5–8 + tranh 5–6 / 7–8)
+  const quarterfinals = winnerMatches.filter((m) => {
+    const r = m.playoffRound ?? 0
+    return maxRound - r === 2
+  })
+  if (quarterfinals.length === 4 && quarterfinals.every((m) => !m.loserToMatchId)) {
+    const loserSeeds = quarterfinals.map((m) => ({
+      key: `L:${m.id}`,
+      pairId: null as string | null,
+    }))
+    const place58 = buildSameRankMiniBracket(
+      loserSeeds,
+      5,
+      courts,
+      createId,
+      courtOffset,
+      // Sau tranh 3–4 (round maxRound+1) để không trùng số vòng
+      maxRound + 2,
+      'championship',
+    )
+    wireFeedMatchesToBracket(quarterfinals, place58, 'L')
+    matches.push(...place58)
   }
 
   return matches
@@ -527,6 +551,7 @@ function buildSameRankMiniBracket(
   createId: CreateId,
   courtOffset: { value: number },
   roundBase: number,
+  bracket: 'championship' | 'placement' = 'placement',
 ): Match[] {
   if (teams.length < 2) {
     return []
@@ -542,7 +567,7 @@ function buildSameRankMiniBracket(
         phase: 'playoff',
         name: `Tranh hạng ${placeStart}-${placeStart + 1}`,
         completed: false,
-        playoffBracket: 'placement',
+        playoffBracket: bracket,
         playoffRound: roundBase,
         pair1Source: teams[0].key,
         pair2Source: teams[1].key,
@@ -609,7 +634,7 @@ function buildSameRankMiniBracket(
           ? `Tranh hạng ${placeStart}-${placeStart + 1}`
           : `Hạng ${placeStart}–${placeStart + n - 1} · Vòng ${roundNum}`,
         completed: false,
-        playoffBracket: 'placement',
+        playoffBracket: bracket,
         playoffRound: roundNum,
         pair1Source,
         pair2Source,
@@ -647,7 +672,7 @@ function buildSameRankMiniBracket(
       phase: 'playoff',
       name: `Tranh hạng ${placeStart + 2}-${placeStart + 3}`,
       completed: false,
-      playoffBracket: 'placement',
+      playoffBracket: bracket,
       playoffRound: roundNum,
       pair1Source: `L:${matches[placeMatchLosers[0]].id}`,
       pair2Source: `L:${matches[placeMatchLosers[1]].id}`,
@@ -1033,6 +1058,11 @@ export function describePlayoffPreview(
     parts.push(
       'Vòng 1 tranh giải: A1–B2, C1–D2… | B1–A2, D1–C2… (#1/#2 cùng bảng ở hai nửa, tránh gặp sớm)',
     )
+  }
+  if (champTeams >= 8) {
+    parts.push('Tranh giải đủ 8 đội: thua tứ kết → tranh hạng 5–8; thua bán kết → tranh 3–4')
+  } else if (champTeams >= 4) {
+    parts.push('Thua bán kết → tranh hạng 3–4')
   }
   if (b === 2 && groupCount >= 2) {
     parts.push(

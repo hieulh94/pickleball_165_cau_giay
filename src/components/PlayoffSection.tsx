@@ -301,16 +301,74 @@ export function PlayoffSection({
   const finalRankings = useMemo(() => calculateFinalRankings(matches), [matches])
   const finalRankingComplete = useMemo(() => isFinalRankingComplete(matches), [matches])
   const expectedPlaces = useMemo(() => expectedFinalPlaceCount(matches), [matches])
-
-  const groupByRound = (list: Match[]) => {
-    const map = new Map<number, Match[]>()
-    for (const m of list) {
-      const r = m.playoffRound ?? 0
-      const arr = map.get(r) ?? []
-      arr.push(m)
-      map.set(r, arr)
+  /** Tổng trận đã hoàn thành (vòng bảng + playoff) theo từng cặp. */
+  const matchesPlayedByPairId = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const match of [...groupMatches, ...matches]) {
+      if (!match.completed) continue
+      for (const pairId of [match.pair1Id, match.pair2Id]) {
+        if (!pairId) continue
+        counts.set(pairId, (counts.get(pairId) ?? 0) + 1)
+      }
     }
-    return [...map.entries()].sort((a, b) => a[0] - b[0])
+    return counts
+  }, [groupMatches, matches])
+
+  /**
+   * Nhánh tranh giải / tranh hạng: gom theo tên vòng,
+   * không gom theo playoffRound (tránh lẫn 3–4 với 5–8 cùng “Vòng N”).
+   */
+  const groupPlayoffStages = (list: Match[]): [string, Match[]][] => {
+    const stageOrder = (label: string): number => {
+      const n = label.replace(/–/g, '-').toLowerCase()
+      if (n === 'tứ kết') return 10
+      if (n === 'bán kết') return 20
+      if (n === 'chung kết') return 30
+      if (n.includes('tranh hạng 3-4')) return 40
+      const hang = n.match(/^hạng\s+(\d+)/)
+      if (hang) return 50 + parseInt(hang[1], 10)
+      const place = n.match(/tranh hạng\s+(\d+)/)
+      if (place) return 80 + parseInt(place[1], 10)
+      if (n.startsWith('vòng ')) {
+        const r = n.match(/vòng\s+(\d+)/)
+        return 5 + (r ? parseInt(r[1], 10) : 0)
+      }
+      // Trận R1 dạng "A3 vs B4"
+      if (/\svs\s/i.test(n)) return 1
+      return 200
+    }
+
+    const stageLabel = (match: Match): string => {
+      const name = (match.name ?? '').trim() || 'Playoff'
+      // "Hạng 5–8 · Vòng 4" → gom chung "Hạng 5–8"
+      const hang = name.match(/^(Hạng\s*\d+\s*[–-]\s*\d+)/i)
+      if (hang) return hang[1].replace(/-/g, '–')
+      // R1 seed: "A3 vs B4" → gom theo số vòng như tranh hạng
+      if (/\svs\s/i.test(name) && !/^Tranh hạng/i.test(name) && !/^Hạng\s/i.test(name)) {
+        return `Vòng ${match.playoffRound ?? 1}`
+      }
+      return name
+    }
+
+    const buckets = new Map<string, Match[]>()
+    for (const match of list) {
+      const label = stageLabel(match)
+      const arr = buckets.get(label) ?? []
+      arr.push(match)
+      buckets.set(label, arr)
+    }
+
+    const stages: [string, Match[]][] = []
+    for (const [label, stageMatches] of buckets) {
+      stages.push([label, stageMatches])
+    }
+
+    return stages.sort(
+      (a, b) =>
+        stageOrder(a[0]) - stageOrder(b[0]) ||
+        (a[1][0]?.playoffRound ?? 0) - (b[1][0]?.playoffRound ?? 0) ||
+        a[0].localeCompare(b[0], 'vi'),
+    )
   }
 
   const canCreate =
@@ -466,10 +524,10 @@ export function PlayoffSection({
           <p className="text-xs text-neutral-500">
             Có thể xóa từng trận hoặc cả nhánh để tạo lại thủ công.
           </p>
-          {groupByRound(championshipMatches).map(([round, roundMatches]) => (
-            <div key={`c-${round}`}>
+          {groupPlayoffStages(championshipMatches).map(([label, roundMatches]) => (
+            <div key={`c-${label}`}>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Vòng {round}
+                {label}
               </p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {roundMatches.map((match) => (
@@ -512,10 +570,10 @@ export function PlayoffSection({
               Từ 3 bảng trở lên: mỗi cùng hạng tạo mini nhánh riêng.
             </p>
           )}
-          {groupByRound(placementMatches).map(([round, roundMatches]) => (
-            <div key={`p-${round}`}>
+          {groupPlayoffStages(placementMatches).map(([label, roundMatches]) => (
+            <div key={`p-${label}`}>
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Vòng {round}
+                {label}
               </p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {roundMatches.map((match) => (
@@ -581,6 +639,7 @@ export function PlayoffSection({
                   <th className="px-4 py-3 font-semibold">Hạng</th>
                   <th className="px-4 py-3 font-semibold">Cặp đôi</th>
                   <th className="px-4 py-3 font-semibold">Cặp số</th>
+                  <th className="px-4 py-3 font-semibold">Số trận</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -594,6 +653,9 @@ export function PlayoffSection({
                       : undefined
                     const pairNumber = row
                       ? (pairNumberById.get(row.pairId) ?? 0)
+                      : 0
+                    const matchesPlayed = row
+                      ? (matchesPlayedByPairId.get(row.pairId) ?? 0)
                       : 0
                     const isTop = place === 1 && !!row
 
@@ -624,6 +686,9 @@ export function PlayoffSection({
                         </td>
                         <td className="px-4 py-3 text-neutral-600">
                           {pairNumber > 0 ? `Cặp ${pairNumber}` : '—'}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums text-neutral-600">
+                          {row ? matchesPlayed : '—'}
                         </td>
                       </tr>
                     )
