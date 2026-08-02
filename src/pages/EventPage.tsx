@@ -77,6 +77,7 @@ import {
   stripAutoPlayoffMatches,
   stripChampionshipPlayoffMatches,
   stripPlacementPlayoffMatches,
+  updatePlayoffMatchPairs,
   validatePlayoffConfig,
 } from '../lib/playoffBracket'
 import {
@@ -177,6 +178,9 @@ export function EventPage() {
   const [manualPlayer1Name, setManualPlayer1Name] = useState('')
   const [manualPlayer2Name, setManualPlayer2Name] = useState('')
   const [manualPairGroup, setManualPairGroup] = useState<string | undefined>(undefined)
+  const [editingPairId, setEditingPairId] = useState<string | null>(null)
+  const [editPairPlayer1Name, setEditPairPlayer1Name] = useState('')
+  const [editPairPlayer2Name, setEditPairPlayer2Name] = useState('')
   const [isEditingEventName, setIsEditingEventName] = useState(false)
   const [eventNameInput, setEventNameInput] = useState('')
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
@@ -628,45 +632,50 @@ export function EventPage() {
 
   const doRemoveParticipant = () => {
     if (event.participantsLocked || event.pairsLocked) {
-      alert('Danh sách người tham gia đã được chốt.')
+      alert(
+        event.pairsLocked
+          ? 'Cặp đôi đã được chốt — mở khóa trước khi xóa người.'
+          : 'Danh sách người tham gia đã được chốt.',
+      )
       setParticipantToDelete(null)
       return
     }
     if (!participantToDelete) return
 
-    const manualPair = event.pairs.find(
+    const pairContaining = event.pairs.find(
       (pair) =>
-        isManualPair(pair) &&
-        (pair.player1Id === participantToDelete || pair.player2Id === participantToDelete),
+        pair.player1Id === participantToDelete || pair.player2Id === participantToDelete,
     )
 
-    if (manualPair) {
-      const partnerId =
-        manualPair.player1Id === participantToDelete
-          ? manualPair.player2Id
-          : manualPair.player1Id
-      const partner = event.participants.find((p) => p.id === partnerId)
-      const idsToRemove = new Set([participantToDelete])
-      if (partner?.isManualEntry) {
-        idsToRemove.add(partnerId)
-      }
-
-      persist({
-        ...event,
-        participants: event.participants.filter((p) => !idsToRemove.has(p.id)),
-        pairs: event.pairs.filter((p) => p.id !== manualPair.id),
-        matches: event.matches.filter(
-          (m) => m.pair1Id !== manualPair.id && m.pair2Id !== manualPair.id,
-        ),
-      })
-    } else {
+    // Chưa ghép cặp → chỉ xóa người, giữ nguyên cặp & lịch.
+    if (!pairContaining) {
       persist({
         ...event,
         participants: event.participants.filter((p) => p.id !== participantToDelete),
-        pairs: [],
-        matches: [],
       })
+      setParticipantToDelete(null)
+      return
     }
+
+    const partnerId =
+      pairContaining.player1Id === participantToDelete
+        ? pairContaining.player2Id
+        : pairContaining.player1Id
+    const partner = event.participants.find((p) => p.id === partnerId)
+    const idsToRemove = new Set([participantToDelete])
+    // Partner chỉ tồn tại vì ghép tay tạm → gỡ luôn; còn lại giữ để có thể ghép lại.
+    if (isManualPair(pairContaining) && partner?.isManualEntry) {
+      idsToRemove.add(partnerId)
+    }
+
+    persist({
+      ...event,
+      participants: event.participants.filter((p) => !idsToRemove.has(p.id)),
+      pairs: event.pairs.filter((p) => p.id !== pairContaining.id),
+      matches: event.matches.filter(
+        (m) => m.pair1Id !== pairContaining.id && m.pair2Id !== pairContaining.id,
+      ),
+    })
 
     setParticipantToDelete(null)
   }
@@ -882,10 +891,117 @@ export function EventPage() {
           isManual: true,
         },
       ],
-      matches: [],
+      // Giữ lịch / kết quả / playoff — cặp mới chỉ chưa có trong lịch.
+      matches: event.matches,
     })
     setManualPlayer1Name('')
     setManualPlayer2Name('')
+  }
+
+  const openEditPairMembers = (pair: Pair) => {
+    const p1 = event.participants.find((p) => p.id === pair.player1Id)
+    const p2 = event.participants.find((p) => p.id === pair.player2Id)
+    setEditingPairId(pair.id)
+    setEditPairPlayer1Name(p1?.name ?? '')
+    setEditPairPlayer2Name(p2?.name ?? '')
+  }
+
+  const handleSavePairMembers = () => {
+    if (!editingPairId) return
+    const target = event.pairs.find((p) => p.id === editingPairId)
+    if (!target) return
+
+    const player1Name = normalizeParticipantName(editPairPlayer1Name)
+    const player2Name = normalizeParticipantName(editPairPlayer2Name)
+
+    if (!player1Name || !player2Name) {
+      alert('Hãy nhập đủ tên 2 người chơi.')
+      return
+    }
+    if (player1Name === player2Name) {
+      alert('Hai người trong một cặp phải khác nhau.')
+      return
+    }
+
+    if (event.participantsLocked) {
+      const exists1 = event.participants.some(
+        (p) => normalizeParticipantName(p.name) === player1Name,
+      )
+      const exists2 = event.participants.some(
+        (p) => normalizeParticipantName(p.name) === player2Name,
+      )
+      if (!exists1 || !exists2) {
+        alert(
+          'Danh sách người tham gia đã được chốt — chỉ chọn người có sẵn trong danh sách.',
+        )
+        return
+      }
+    }
+
+    const allParticipants = [...event.participants]
+    const findOrCreateParticipant = (normalizedName: string, rawName: string) => {
+      const existed = allParticipants.find(
+        (participant) => normalizeParticipantName(participant.name) === normalizedName,
+      )
+      if (existed) return attachClubPlayerId(existed)
+
+      const created = attachClubPlayerId({
+        id: crypto.randomUUID(),
+        name: rawName.trim().replace(/\s+/g, ' '),
+        skillLevel: 'B',
+        isManualEntry: true,
+      })
+      allParticipants.push(created)
+      return created
+    }
+
+    const participant1 = findOrCreateParticipant(player1Name, editPairPlayer1Name)
+    const participant2 = findOrCreateParticipant(player2Name, editPairPlayer2Name)
+
+    const usedElsewhere = new Set(
+      event.pairs
+        .filter((pair) => pair.id !== editingPairId)
+        .flatMap((pair) => [pair.player1Id, pair.player2Id]),
+    )
+    if (usedElsewhere.has(participant1.id) || usedElsewhere.has(participant2.id)) {
+      alert('Một trong hai người đã thuộc cặp khác. Chọn người chưa có cặp hoặc người đang trong cặp này.')
+      return
+    }
+
+    const nextPairs = event.pairs.map((pair) =>
+      pair.id === editingPairId
+        ? {
+            ...pair,
+            player1Id: participant1.id,
+            player2Id: participant2.id,
+            isManual: true,
+            locked: true,
+          }
+        : pair,
+    )
+    const pairedIds = new Set(
+      nextPairs.flatMap((pair) => [pair.player1Id, pair.player2Id]),
+    )
+    // Người bị thay ra khỏi cặp → gỡ khỏi danh sách (tránh kẹt “còn người chưa ghép” khi chốt lại).
+    const droppedIds = new Set(
+      [target.player1Id, target.player2Id].filter(
+        (id) => id !== participant1.id && id !== participant2.id,
+      ),
+    )
+    const nextParticipants = allParticipants.filter(
+      (p) => pairedIds.has(p.id) || !droppedIds.has(p.id),
+    )
+
+    persist({
+      ...event,
+      participants: nextParticipants,
+      pairs: nextPairs,
+      // Giữ nguyên toàn bộ lịch, kết quả, playoff (match gắn theo pairId).
+      matches: event.matches,
+    })
+    setEditingPairId(null)
+    setEditPairPlayer1Name('')
+    setEditPairPlayer2Name('')
   }
 
   const toggleRoundCollapsed = (round: number) => {
@@ -1190,6 +1306,26 @@ export function EventPage() {
     persist({ ...event, matches: [...event.matches, match] })
   }
 
+  const handleUpdatePlayoffMatchPairs = (
+    matchId: string,
+    pair1Id: string,
+    pair2Id: string,
+  ) => {
+    if (!event.pairs.some((p) => p.id === pair1Id) || !event.pairs.some((p) => p.id === pair2Id)) {
+      alert('Cặp không hợp lệ.')
+      return
+    }
+    if (pair1Id === pair2Id) {
+      alert('Hai cặp phải khác nhau.')
+      return
+    }
+    const matches = updatePlayoffMatchPairs(event.matches, matchId, pair1Id, pair2Id)
+    persist({ ...event, matches })
+    if (selectedMatch?.id === matchId) {
+      setSelectedMatch(matches.find((m) => m.id === matchId) ?? null)
+    }
+  }
+
   const handleSavePlayoffConfig = (config: PlayoffConfig) => {
     const error = validatePlayoffConfig(standings, event.splitGroups, config)
     if (error) {
@@ -1335,13 +1471,20 @@ export function EventPage() {
     ? event.participants.find((p) => p.id === participantToDelete)
     : null
 
-  const manualPairPendingDelete =
+  const pairPendingDelete =
     participantToDelete &&
     event.pairs.find(
       (pair) =>
-        isManualPair(pair) &&
-        (pair.player1Id === participantToDelete || pair.player2Id === participantToDelete),
+        pair.player1Id === participantToDelete || pair.player2Id === participantToDelete,
     )
+
+  const deleteParticipantMessage = (() => {
+    const name = participantPendingDelete?.name ?? ''
+    if (!pairPendingDelete) {
+      return `Bạn có chắc muốn xóa "${name}"? Người này chưa ghép cặp — cặp đôi và lịch thi đấu được giữ nguyên.`
+    }
+    return `Bạn có chắc muốn xóa "${name}"? Chỉ cặp chứa người này và các trận của cặp đó sẽ bị xóa. Các cặp và lịch còn lại được giữ nguyên.`
+  })()
 
   const addCourt = () => {
     if (event.scheduleLocked) {
@@ -1791,42 +1934,106 @@ export function EventPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {pairs.map((pair) => {
                     const pairNumber = pairNumberById.get(pair.id) ?? 0
+                    const isEditing = editingPairId === pair.id
+                    const editNameOptions = [
+                      ...unpairedParticipants.map((p) => p.name),
+                      ...event.participants
+                        .filter(
+                          (p) => p.id === pair.player1Id || p.id === pair.player2Id,
+                        )
+                        .map((p) => p.name),
+                    ]
                     return (
                       <div key={pair.id} className={pairCardClassName(pairNumber)}>
                         <div className="flex items-start justify-between gap-2">
                           <p className="font-bold">Cặp {pairNumber}</p>
-                          {canEdit && event.splitGroups && !event.groupsLocked && (
-                            <PairGroupSelect
-                              value={pair.group}
-                              groupCount={resolvedGroupCount}
-                              onChange={(nextGroup) =>
-                                handlePairGroupChange(pair.id, nextGroup)
-                              }
-                              className="max-w-[8.5rem] rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[11px] focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
-                            />
-                          )}
-                          {event.splitGroups && event.groupsLocked && pair.group && (
-                            <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
-                              {pair.group}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {canEdit && event.splitGroups && !event.groupsLocked && (
+                              <PairGroupSelect
+                                value={pair.group}
+                                groupCount={resolvedGroupCount}
+                                onChange={(nextGroup) =>
+                                  handlePairGroupChange(pair.id, nextGroup)
+                                }
+                                className="max-w-[8.5rem] rounded-md border border-neutral-300 bg-white px-1.5 py-0.5 text-[11px] focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
+                              />
+                            )}
+                            {event.splitGroups && event.groupsLocked && pair.group && (
+                              <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                                {pair.group}
+                              </span>
+                            )}
+                            {canEdit && !event.pairsLocked && !isEditing && (
+                              <button
+                                type="button"
+                                onClick={() => openEditPairMembers(pair)}
+                                className="rounded-md border border-white/40 bg-black/10 px-1.5 py-0.5 text-[11px] font-semibold hover:bg-black/15"
+                              >
+                                Sửa TV
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p className="mt-0.5 text-sm leading-snug">
-                          {getPairShortLabel(pair, event.participants)}
-                          <PairTypeBadge pair={pair} />
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-neutral-500">
-                          Elo TB:{' '}
-                          {Math.round(
-                            (getParticipantRating(
-                              event.participants.find((p) => p.id === pair.player1Id)!,
-                            ) +
-                              getParticipantRating(
-                                event.participants.find((p) => p.id === pair.player2Id)!,
-                              )) /
-                              2,
-                          )}
-                        </p>
+                        {isEditing ? (
+                          <div className="mt-2 space-y-2 rounded-lg border border-white/50 bg-white/80 p-2.5 text-neutral-800">
+                            <p className="text-[11px] text-neutral-500">
+                              Đổi thành viên — lịch & kết quả giữ nguyên.
+                            </p>
+                            <PlayerNameInput
+                              value={editPairPlayer1Name}
+                              onChange={setEditPairPlayer1Name}
+                              extraNames={editNameOptions}
+                              placeholder="Người chơi 1"
+                              className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
+                            />
+                            <PlayerNameInput
+                              value={editPairPlayer2Name}
+                              onChange={setEditPairPlayer2Name}
+                              extraNames={editNameOptions}
+                              placeholder="Người chơi 2"
+                              className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600/20"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={handleSavePairMembers}
+                                className="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-700"
+                              >
+                                Lưu
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPairId(null)
+                                  setEditPairPlayer1Name('')
+                                  setEditPairPlayer2Name('')
+                                }}
+                                className="rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="mt-0.5 text-sm leading-snug">
+                              {getPairShortLabel(pair, event.participants)}
+                              <PairTypeBadge pair={pair} />
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-neutral-500">
+                              Elo TB:{' '}
+                              {Math.round(
+                                (getParticipantRating(
+                                  event.participants.find((p) => p.id === pair.player1Id)!,
+                                ) +
+                                  getParticipantRating(
+                                    event.participants.find((p) => p.id === pair.player2Id)!,
+                                  )) /
+                                  2,
+                              )}
+                            </p>
+                          </>
+                        )}
                       </div>
                     )
                   })}
@@ -2203,6 +2410,7 @@ export function EventPage() {
             onClearChampionship={handleClearChampionship}
             onClearPlacement={handleClearPlacement}
             onUpdateResult={setSelectedMatch}
+            onUpdateMatchPairs={handleUpdatePlayoffMatchPairs}
           />
         </CollapsibleSection>
       )}
@@ -2297,11 +2505,7 @@ export function EventPage() {
       <ConfirmDialog
         open={!!participantToDelete}
         title="Xóa người tham gia"
-        message={
-          manualPairPendingDelete
-            ? `Bạn có chắc muốn xóa "${participantPendingDelete?.name ?? ''}"? Cặp ghép tay chứa người này sẽ bị xóa. Các cặp và lịch khác được giữ nguyên.`
-            : `Bạn có chắc muốn xóa "${participantPendingDelete?.name ?? ''}"? Toàn bộ cặp đôi và lịch thi đấu hiện tại sẽ bị xóa.`
-        }
+        message={deleteParticipantMessage}
         confirmLabel="Xóa"
         onConfirm={doRemoveParticipant}
         onCancel={() => setParticipantToDelete(null)}

@@ -137,57 +137,21 @@ function pushSeedMatch(
 }
 
 /**
- * Vòng 1 hạng 1–2: #1 và #2 cùng bảng nằm hai nửa bracket đối diện
- * (tránh gặp nhau ngay vòng sau tứ kết).
- *
- * N chẵn (VD 4 bảng): A1–B2, C1–D2 | B1–A2, D1–C2
- * N lẻ: ghép đôi bảng + bye cho bảng lẻ (VD 3 bảng: A1–B2, C1–bye | B1–A2, C2–bye)
+ * Vòng 1 hạng 1–2: xoay vòng theo bảng
+ * A1–B2, B1–C2, C1–D2, D1–A2…
  */
-function buildRankOneTwoOppositeHalfPairings(groups: GroupStandings[]): ChampNode[] {
+function buildRankOneTwoCyclicPairings(groups: GroupStandings[]): ChampNode[] {
   const n = groups.length
   const pairings: ChampNode[] = []
-
-  if (n % 2 === 0) {
-    // Nửa trên: A1–B2, C1–D2, …
-    for (let i = 0; i < n; i += 2) {
-      pushSeedMatch(pairings, groups[i], 1, groups[i + 1], 2)
-    }
-    // Nửa dưới: B1–A2, D1–C2, …
-    for (let i = 0; i < n; i += 2) {
-      pushSeedMatch(pairings, groups[i + 1], 1, groups[i], 2)
-    }
-    return pairings
-  }
-
-  // N lẻ: ghép từng cặp bảng; bảng cuối nhận bye ở cả hai nửa
-  for (let i = 0; i + 1 < n; i += 2) {
-    pushSeedMatch(pairings, groups[i], 1, groups[i + 1], 2)
-  }
-  {
-    const last = groups[n - 1]
-    const node = seedNodeAtRank(last, 1)
-    if (node) {
-      pairings.push(node)
-      pairings.push({ kind: 'bye' })
-    }
-  }
-  for (let i = 0; i + 1 < n; i += 2) {
-    pushSeedMatch(pairings, groups[i + 1], 1, groups[i], 2)
-  }
-  {
-    const last = groups[n - 1]
-    const node = seedNodeAtRank(last, 2)
-    if (node) {
-      pairings.push(node)
-      pairings.push({ kind: 'bye' })
-    }
+  for (let i = 0; i < n; i++) {
+    pushSeedMatch(pairings, groups[i], 1, groups[(i + 1) % n], 2)
   }
   return pairings
 }
 
 /**
  * Vòng 1 tranh giải:
- * a≥2 → #1/#2 cùng bảng ở hai nửa đối diện (A1–B2, C1–D2 | B1–A2, D1–C2…).
+ * a≥2 → xoay vòng A1–B2, B1–C2, C1–D2, D1–A2…
  * a>2 → thêm cùng hạng (N=2: Ar–Br; N≥3: ghép cặp lần lượt).
  */
 function buildChampionshipFirstRoundSeeds(
@@ -207,7 +171,7 @@ function buildChampionshipFirstRoundSeeds(
     return pairings
   }
 
-  pairings.push(...buildRankOneTwoOppositeHalfPairings(groups))
+  pairings.push(...buildRankOneTwoCyclicPairings(groups))
 
   for (let rank = 3; rank <= a; rank++) {
     if (n === 2) {
@@ -233,7 +197,7 @@ function buildChampionshipFirstRoundSeeds(
 }
 
 /**
- * Bracket tranh giải: vòng 1 tách #1/#2 cùng bảng sang hai nửa,
+ * Bracket tranh giải: vòng 1 xoay vòng A1–B2, B1–C2…,
  * rồi single-elim + tranh 3–4 (thua bán kết) + tranh 5–8 (thua tứ kết, khi đủ 8 đội).
  */
 function buildChampionshipMatches(
@@ -1037,6 +1001,70 @@ export function applyPlayoffResult(
   return next
 }
 
+/** Cho phép sửa cặp tay ở mọi trận tranh giải / tranh hạng (bracket tự động). */
+export function canManuallyEditPlayoffPairs(match: Match): boolean {
+  return isChampionshipPlayoffMatch(match) || isPlacementPlayoffMatch(match)
+}
+
+/**
+ * Đổi cặp tham gia trận tranh giải / tranh hạng.
+ * Xóa kết quả trận đó và slot đội ở các trận phía dưới.
+ */
+export function updatePlayoffMatchPairs(
+  matches: Match[],
+  matchId: string,
+  pair1Id: string,
+  pair2Id: string,
+): Match[] {
+  if (!pair1Id || !pair2Id || pair1Id === pair2Id) return matches
+  const target = matches.find((m) => m.id === matchId)
+  if (!target || !canManuallyEditPlayoffPairs(target)) return matches
+
+  const pairsChanged = target.pair1Id !== pair1Id || target.pair2Id !== pair2Id
+  if (!pairsChanged) return matches
+
+  // Gỡ kết quả các trận phía dưới trước khi xóa slot (clearDownstream bỏ qua trận đã xong)
+  const byId = new Map(matches.map((m) => [m.id, m]))
+  const queue = [matchId]
+  const affected = new Set<string>()
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    const m = byId.get(id)
+    if (!m) continue
+    for (const nextId of [m.winnerToMatchId, m.loserToMatchId]) {
+      if (nextId && !affected.has(nextId)) {
+        affected.add(nextId)
+        queue.push(nextId)
+      }
+    }
+  }
+
+  let next = matches.map((m) => {
+    if (m.id === matchId) {
+      return {
+        ...m,
+        pair1Id,
+        pair2Id,
+        pair1Source: undefined,
+        pair2Source: undefined,
+        completed: false,
+        score1: undefined,
+        score2: undefined,
+      }
+    }
+    if (!affected.has(m.id)) return m
+    return {
+      ...m,
+      completed: false,
+      score1: undefined,
+      score2: undefined,
+    }
+  })
+
+  next = clearDownstreamFrom(next, matchId)
+  return next
+}
+
 export function describePlayoffPreview(
   groupCount: number,
   pairsPerGroup: number,
@@ -1056,7 +1084,7 @@ export function describePlayoffPreview(
   }
   if (groupCount >= 2 && a >= 2) {
     parts.push(
-      'Vòng 1 tranh giải: A1–B2, C1–D2… | B1–A2, D1–C2… (#1/#2 cùng bảng ở hai nửa, tránh gặp sớm)',
+      'Vòng 1 tranh giải: A1–B2, B1–C2, C1–D2, D1–A2… (xoay vòng theo bảng)',
     )
   }
   if (champTeams >= 8) {

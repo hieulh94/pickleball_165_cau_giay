@@ -10,6 +10,7 @@ import {
   type PairStandingInfo,
 } from '../lib/standings'
 import {
+  canManuallyEditPlayoffPairs,
   canRegeneratePlayoff,
   calculateFinalRankings,
   countCompletedGroupMatches,
@@ -91,6 +92,7 @@ interface PlayoffSectionProps {
   onClearChampionship?: () => void
   onClearPlacement?: () => void
   onUpdateResult: (match: Match) => void
+  onUpdateMatchPairs?: (matchId: string, pair1Id: string, pair2Id: string) => void
 }
 
 function PairMiniCard({
@@ -138,23 +140,45 @@ function MatchCard({
   pairs,
   participants,
   pairNumberById,
+  pairOptions,
   readOnly,
   onDeleteMatch,
   onUpdateResult,
+  onUpdateMatchPairs,
 }: {
   match: Match
   pairs: Pair[]
   participants: Participant[]
   pairNumberById: Map<string, number>
+  pairOptions: { id: string; label: string }[]
   readOnly: boolean
   onDeleteMatch: (matchId: string) => void
   onUpdateResult: (match: Match) => void
+  onUpdateMatchPairs?: (matchId: string, pair1Id: string, pair2Id: string) => void
 }) {
   const pair1 = match.pair1Id ? pairs.find((p) => p.id === match.pair1Id) : undefined
   const pair2 = match.pair2Id ? pairs.find((p) => p.id === match.pair2Id) : undefined
   const pair1Number = match.pair1Id ? (pairNumberById.get(match.pair1Id) ?? 0) : 0
   const pair2Number = match.pair2Id ? (pairNumberById.get(match.pair2Id) ?? 0) : 0
   const canEnterResult = Boolean(match.pair1Id && match.pair2Id)
+  const canEditPairs =
+    !readOnly && !!onUpdateMatchPairs && canManuallyEditPlayoffPairs(match)
+
+  const [editingPairs, setEditingPairs] = useState(false)
+  const [editPair1Id, setEditPair1Id] = useState(match.pair1Id ?? '')
+  const [editPair2Id, setEditPair2Id] = useState(match.pair2Id ?? '')
+
+  const openEditPairs = () => {
+    setEditPair1Id(match.pair1Id ?? '')
+    setEditPair2Id(match.pair2Id ?? '')
+    setEditingPairs(true)
+  }
+
+  const canSavePairs =
+    editPair1Id !== '' &&
+    editPair2Id !== '' &&
+    editPair1Id !== editPair2Id &&
+    (editPair1Id !== (match.pair1Id ?? '') || editPair2Id !== (match.pair2Id ?? ''))
 
   const canDelete =
     !readOnly &&
@@ -184,15 +208,26 @@ function MatchCard({
             </span>
           )}
         </div>
-        {canDelete && (
-          <button
-            type="button"
-            onClick={() => onDeleteMatch(match.id)}
-            className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-          >
-            Xóa
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {canEditPairs && !editingPairs && (
+            <button
+              type="button"
+              onClick={openEditPairs}
+              className="rounded-lg border border-primary-200 px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50"
+            >
+              Sửa cặp
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => onDeleteMatch(match.id)}
+              className="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              Xóa
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid flex-1 grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-stretch gap-2">
@@ -212,6 +247,74 @@ function MatchCard({
           sourceLabel={match.pair2Source}
         />
       </div>
+
+      {editingPairs && canEditPairs && (
+        <div className="mt-3 space-y-2 rounded-xl border border-primary-100 bg-white p-3">
+          <p className="text-xs text-neutral-500">
+            Đổi cặp tay. Nếu trận đã có kết quả, kết quả và các trận phía dưới sẽ bị xóa.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-neutral-600">
+                Cặp 1
+              </label>
+              <select
+                value={editPair1Id}
+                onChange={(e) => setEditPair1Id(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+              >
+                <option value="">Chọn cặp</option>
+                {pairOptions
+                  .filter((opt) => opt.id !== editPair2Id)
+                  .map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-neutral-600">
+                Cặp 2
+              </label>
+              <select
+                value={editPair2Id}
+                onChange={(e) => setEditPair2Id(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+              >
+                <option value="">Chọn cặp</option>
+                {pairOptions
+                  .filter((opt) => opt.id !== editPair1Id)
+                  .map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!canSavePairs}
+              onClick={() => {
+                onUpdateMatchPairs?.(match.id, editPair1Id, editPair2Id)
+                setEditingPairs(false)
+              }}
+              className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Lưu cặp
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingPairs(false)}
+              className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
 
       {match.completed && (
         <p className="my-3 text-center text-2xl font-bold text-primary-700">
@@ -251,6 +354,7 @@ export function PlayoffSection({
   onClearChampionship,
   onClearPlacement,
   onUpdateResult,
+  onUpdateMatchPairs,
 }: PlayoffSectionProps) {
   const [name, setName] = useState('')
   const [court, setCourt] = useState('')
@@ -537,9 +641,11 @@ export function PlayoffSection({
                     pairs={pairs}
                     participants={participants}
                     pairNumberById={pairNumberById}
+                    pairOptions={pairOptions}
                     readOnly={readOnly}
                     onDeleteMatch={onDeleteMatch}
                     onUpdateResult={onUpdateResult}
+                    onUpdateMatchPairs={onUpdateMatchPairs}
                   />
                 ))}
               </div>
@@ -583,9 +689,11 @@ export function PlayoffSection({
                     pairs={pairs}
                     participants={participants}
                     pairNumberById={pairNumberById}
+                    pairOptions={pairOptions}
                     readOnly={readOnly}
                     onDeleteMatch={onDeleteMatch}
                     onUpdateResult={onUpdateResult}
+                    onUpdateMatchPairs={onUpdateMatchPairs}
                   />
                 ))}
               </div>
@@ -605,9 +713,11 @@ export function PlayoffSection({
                 pairs={pairs}
                 participants={participants}
                 pairNumberById={pairNumberById}
+                pairOptions={pairOptions}
                 readOnly={readOnly}
                 onDeleteMatch={onDeleteMatch}
                 onUpdateResult={onUpdateResult}
+                onUpdateMatchPairs={onUpdateMatchPairs}
               />
             ))}
           </div>
