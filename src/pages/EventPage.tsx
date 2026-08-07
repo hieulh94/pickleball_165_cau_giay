@@ -69,6 +69,7 @@ import { calculateStandings, hasCompletedMatches } from '../lib/standings'
 import {
   applyPlayoffResult,
   buildPlayoffMatches,
+  calculateFinalRankings,
   canRegeneratePlayoff,
   isGroupStageComplete,
   isChampionshipPlayoffMatch,
@@ -378,6 +379,37 @@ export function EventPage() {
     if (!event) return []
     return calculateStandings(event.pairs, groupMatches, event.splitGroups)
   }, [event, groupMatches])
+
+  /**
+   * Hạng để chia beer:
+   * - Có chia bảng → BXH cuối playoff
+   * - 1 bảng (không chia) → BXH vòng bảng
+   */
+  const placeByPairId = useMemo(() => {
+    const map = new Map<string, number>()
+    if (!event) return map
+
+    if (event.splitGroups) {
+      for (const row of calculateFinalRankings(playoffMatches)) {
+        map.set(row.pairId, row.place)
+      }
+      return map
+    }
+
+    if (!hasCompletedMatches(groupMatches)) return map
+
+    const single = standings.find((g) => g.group == null) ?? standings[0]
+    if (!single) return map
+    const ordered = [...single.standings].sort(
+      (a, b) => a.rank - b.rank || a.pairId.localeCompare(b.pairId),
+    )
+    ordered.forEach((row, index) => {
+      map.set(row.pairId, index + 1)
+    })
+    return map
+  }, [event, playoffMatches, standings, groupMatches])
+
+  const beerRankingSource: 'playoff' | 'group' = event?.splitGroups ? 'playoff' : 'group'
 
   const unpairedParticipants = useMemo(() => {
     if (!event) return []
@@ -2422,6 +2454,9 @@ export function EventPage() {
         open={contributionDialogOpen}
         participants={event.participants}
         participantContributions={event.participantContributions}
+        pairs={event.pairs}
+        placeByPairId={placeByPairId}
+        rankingSource={beerRankingSource}
         onClose={() => setContributionDialogOpen(false)}
         onSave={handleSaveContribution}
       />
