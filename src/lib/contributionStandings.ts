@@ -12,6 +12,7 @@ export interface ContributionStanding {
   eventsContributed: number
   matchesPlayed: number
   wins: number
+  losses: number
   /** Elo — chỉ dùng khi metric = rating */
   rating?: number
   /** Hạng A/B — kèm Elo */
@@ -25,6 +26,7 @@ interface PlayerContribution {
   contributionMatchIds: Set<string>
   matchesPlayed: number
   wins: number
+  losses: number
 }
 
 export type PlayerContributionStats = PlayerContribution
@@ -88,8 +90,10 @@ export function buildPlayerContributionStats(
 
       if (match.score1 > match.score2) {
         for (const player of team1) ensurePlayer(stats, player.name).wins++
+        for (const player of team2) ensurePlayer(stats, player.name).losses++
       } else if (match.score2 > match.score1) {
         for (const player of team2) ensurePlayer(stats, player.name).wins++
+        for (const player of team1) ensurePlayer(stats, player.name).losses++
       }
 
       if (source === 'showmatch' && match.participantContributions) {
@@ -125,6 +129,7 @@ function ensurePlayer(
     contributionMatchIds: new Set(),
     matchesPlayed: 0,
     wins: 0,
+    losses: 0,
   }
   stats.set(key, created)
   return created
@@ -164,6 +169,7 @@ export function calculateContributionStandings(
       eventsContributed: contributionCount(row, source),
       matchesPlayed: row.matchesPlayed,
       wins: row.wins,
+      losses: row.losses,
     }))
     .sort((a, b) => {
       if (b.totalAmount !== a.totalAmount) return b.totalAmount - a.totalAmount

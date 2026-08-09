@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   BEER_POOL_RANK_STEP,
-  formatContributionAmount,
   minBeerPoolTotal,
   parseContributionAmountInput,
-  parseContributionInputToDong,
   splitBeerPoolByRank,
   sumBeerPoolAmounts,
-  toContributionInputUnits,
 } from '../lib/contributionMoney'
 import { getPairLabel } from '../lib/pairing'
 import { getParticipantGender } from '../lib/participantGender'
@@ -69,8 +66,7 @@ export function ContributionDialog({
     const nextDraft: Record<string, string> = {}
     for (const participant of participants) {
       const saved = participantContributions?.[participant.id]
-      nextDraft[participant.id] =
-        saved && saved > 0 ? String(toContributionInputUnits(saved)) : '0'
+      nextDraft[participant.id] = saved && saved > 0 ? String(saved) : '0'
     }
     setDraft(nextDraft)
 
@@ -84,7 +80,7 @@ export function ContributionDialog({
   const draftTotal = useMemo(
     () =>
       participants.reduce(
-        (sum, participant) => sum + parseContributionInputToDong(draft[participant.id] ?? '0'),
+        (sum, participant) => sum + parseContributionAmountInput(draft[participant.id] ?? '0'),
         0,
       ),
     [participants, draft],
@@ -104,7 +100,7 @@ export function ContributionDialog({
   const handleSave = () => {
     const contributions: Record<string, number> = {}
     for (const participant of participants) {
-      const amount = parseContributionInputToDong(draft[participant.id] ?? '0')
+      const amount = parseContributionAmountInput(draft[participant.id] ?? '0')
       if (amount > 0) {
         contributions[participant.id] = amount
       }
@@ -117,8 +113,7 @@ export function ContributionDialog({
     const nextDraft: Record<string, string> = {}
     for (const participant of participants) {
       const saved = participantContributions?.[participant.id]
-      nextDraft[participant.id] =
-        saved && saved > 0 ? String(toContributionInputUnits(saved)) : '0'
+      nextDraft[participant.id] = saved && saved > 0 ? String(saved) : '0'
     }
     setDraft(nextDraft)
     setEditing(true)
@@ -128,7 +123,7 @@ export function ContributionDialog({
     setPoolError(null)
     const total = parseContributionAmountInput(poolInput)
     if (total <= 0) {
-      setPoolError('Nhập tổng số tiền quỹ beer.')
+      setPoolError('Nhập tổng quỹ.')
       setPoolAmounts(null)
       return
     }
@@ -151,7 +146,7 @@ export function ContributionDialog({
     const minTotal = minBeerPoolTotal(splitCount)
     if (total < minTotal) {
       setPoolError(
-        `Tổng tối thiểu với ${splitCount} đội (bước ${formatContributionAmount(BEER_POOL_RANK_STEP)}đ) là ${formatContributionAmount(minTotal)}đ.`,
+        `Tổng tối thiểu với ${splitCount} đội (bước ${BEER_POOL_RANK_STEP}) là ${minTotal}.`,
       )
       setPoolAmounts(null)
       return
@@ -161,7 +156,11 @@ export function ContributionDialog({
     try {
       amounts = splitBeerPoolByRank(splitCount, total)
     } catch (err) {
-      setPoolError(err instanceof Error ? err.message : 'Không chia được quỹ.')
+      setPoolError(
+        err instanceof Error
+          ? `Tổng tối thiểu với ${splitCount} đội (bước ${BEER_POOL_RANK_STEP}) là ${minTotal}.`
+          : 'Không chia được quỹ.',
+      )
       setPoolAmounts(null)
       return
     }
@@ -174,11 +173,10 @@ export function ContributionDialog({
 
     for (const { pair, place } of rankedPairs) {
       const teamAmount = amounts[place - 1] ?? 0
-      // Chia đôi mức đội cho 2 thành viên → tổng người = tổng mức đội = số nhập.
       const share1 = Math.floor(teamAmount / 2)
       const share2 = teamAmount - share1
-      nextDraft[pair.player1Id] = String(toContributionInputUnits(share1))
-      nextDraft[pair.player2Id] = String(toContributionInputUnits(share2))
+      nextDraft[pair.player1Id] = String(share1)
+      nextDraft[pair.player2Id] = String(share2)
     }
 
     setDraft(nextDraft)
@@ -186,6 +184,10 @@ export function ContributionDialog({
   }
 
   const poolSum = poolAmounts ? sumBeerPoolAmounts(poolAmounts) : 0
+  const minUi =
+    (rankedPlaceCount || teamCount) >= 2
+      ? minBeerPoolTotal(rankedPlaceCount || teamCount)
+      : 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -194,7 +196,7 @@ export function ContributionDialog({
         <div className="shrink-0 border-b border-neutral-100 px-6 py-4">
           <h3 className="text-lg font-semibold text-neutral-900">Beer cống hiến</h3>
           <p className="mt-1 text-sm text-neutral-500">
-            Nhập theo nghìn đồng (vd: 20 = 20.000đ) — dùng để tính BXH beer
+            Nhập số giữ nguyên (vd: 20 = 20) — dùng để tính BXH beer
           </p>
         </div>
 
@@ -207,11 +209,9 @@ export function ContributionDialog({
                 <p className="text-sm font-semibold text-amber-900">Chia quỹ theo hạng đội</p>
                 <p className="mt-1 text-xs leading-relaxed text-amber-800/90">
                   Chỉ Top 1 miễn phí — Top 2 trở đi đều phải đóng. Mỗi hạng sau đóng hơn hạng
-                  trước {formatContributionAmount(BEER_POOL_RANK_STEP)}đ. Tổng mức các đội đúng
-                  bằng số nhập ({rankedPlaceCount || teamCount} đội
-                  {(rankedPlaceCount || teamCount) >= 2
-                    ? ` · tối thiểu ${formatContributionAmount(minBeerPoolTotal(rankedPlaceCount || teamCount))}đ`
-                    : ''}
+                  trước {BEER_POOL_RANK_STEP}. Tổng mức các đội đúng bằng số nhập (
+                  {rankedPlaceCount || teamCount} đội
+                  {(rankedPlaceCount || teamCount) >= 2 ? ` · tối thiểu ${minUi}` : ''}
                   ). Hạng lấy từ{' '}
                   {rankingSource === 'group'
                     ? 'bảng xếp hạng vòng bảng'
@@ -221,14 +221,14 @@ export function ContributionDialog({
                 <div className="mt-3 flex flex-wrap items-end gap-2">
                   <div className="min-w-[10rem] flex-1">
                     <label className="mb-1 block text-[11px] font-medium text-amber-900">
-                      Tổng quỹ (đ)
+                      Tổng quỹ
                     </label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={poolInput}
                       onChange={(e) => setPoolInput(e.target.value)}
-                      placeholder="VD: 280000"
+                      placeholder="VD: 1405"
                       className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
                     />
                   </div>
@@ -268,7 +268,7 @@ export function ContributionDialog({
                                 {amount === 0 ? (
                                   <span className="text-emerald-700">0 (miễn)</span>
                                 ) : (
-                                  formatContributionAmount(amount)
+                                  amount
                                 )}
                               </td>
                             </tr>
@@ -277,8 +277,7 @@ export function ContributionDialog({
                       </tbody>
                     </table>
                     <p className="border-t border-amber-100 px-3 py-2 text-xs text-amber-900/80">
-                      Tổng mức đội:{' '}
-                      <span className="font-semibold">{formatContributionAmount(poolSum)}đ</span>
+                      Tổng mức đội: <span className="font-semibold">{poolSum}</span>
                       {' · '}Đã điền vào danh sách bên dưới — bấm Lưu để ghi.
                     </p>
                   </div>
@@ -331,21 +330,18 @@ export function ContributionDialog({
                           )}
                         </div>
                         {editing ? (
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={draft[participant.id] ?? '0'}
-                              onChange={(e) =>
-                                setDraft((prev) => ({
-                                  ...prev,
-                                  [participant.id]: e.target.value,
-                                }))
-                              }
-                              className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-right text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
-                            />
-                            <span className="text-xs font-medium text-neutral-500">×1.000đ</span>
-                          </div>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={draft[participant.id] ?? '0'}
+                            onChange={(e) =>
+                              setDraft((prev) => ({
+                                ...prev,
+                                [participant.id]: e.target.value,
+                              }))
+                            }
+                            className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-right text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+                          />
                         ) : (
                           <ContributionAmount
                             amount={savedAmount}
@@ -368,7 +364,7 @@ export function ContributionDialog({
                   />
                 </p>
                 <p className="mt-1 text-xs text-secondary-700">
-                  Nhập theo nghìn (20 = 20.000đ). Số &gt; 0 được cộng vào BXH beer.
+                  Số nhập giữ nguyên khi lưu. Số &gt; 0 được cộng vào BXH beer.
                 </p>
               </div>
             </div>

@@ -142,11 +142,7 @@ export function ContributionLeaderboardPanel() {
               rating={selectedPlayer?.rating ?? DEFAULT_CLUB_PLAYER_RATING}
               skillLevel={selectedPlayer?.skillLevel}
               wins={selectedPlayer?.wins}
-              losses={
-                selectedPlayer
-                  ? Math.max(0, (selectedPlayer.matchesPlayed ?? 0) - (selectedPlayer.wins ?? 0))
-                  : undefined
-              }
+              losses={selectedPlayer?.losses}
               history={selectedEloHistory}
               onClose={() => setSelectedPlayer(null)}
             />

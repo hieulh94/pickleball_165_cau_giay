@@ -1,5 +1,10 @@
 import { getPlayerAvatarColor, getPlayerInitials } from '../../lib/clubPlayers'
-import type { LeaderboardMetric, LeaderboardSource, LeaderboardStanding } from '../../lib/leaderboard'
+import {
+  formatWinRatePercent,
+  type LeaderboardMetric,
+  type LeaderboardSource,
+  type LeaderboardStanding,
+} from '../../lib/leaderboard'
 import { cn } from '../../lib/cn'
 import { ContributionAmount } from './ContributionCompactAmount'
 
@@ -32,17 +37,24 @@ function contributionLabel(count: number, source: LeaderboardSource): string {
 }
 
 function PlayerStats({ row, source }: { row: LeaderboardStanding; source: LeaderboardSource }) {
+  const record =
+    row.wins + row.losses > 0
+      ? `${row.wins}-${row.losses} (${formatWinRatePercent(row.wins, row.losses)})`
+      : null
+
   return (
     <>
       <p className="mt-0.5 text-[10px] text-text-secondary sm:hidden">
-        🎾 {row.matchesPlayed} · {source === 'showmatch' ? '⭐' : '🎮'} {row.eventsContributed}
+        🎾 {row.matchesPlayed}
+        {record ? ` · ${record}` : ''} · {source === 'showmatch' ? '⭐' : '🎮'}{' '}
+        {row.eventsContributed}
       </p>
       <div className="mt-1 hidden flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-text-secondary sm:flex">
         <span>🎾 {row.matchesPlayed} trận</span>
         <span>
           {source === 'showmatch' ? '⭐' : '🎮'} {contributionLabel(row.eventsContributed, source)}
         </span>
-        {row.wins > 0 && <span>🏆 {row.wins} thắng</span>}
+        {record && <span>📊 {record}</span>}
       </div>
     </>
   )
@@ -85,6 +97,8 @@ function formatPodiumMetric(
       return null
     case 'wins':
       return `${row.wins} thắng`
+    case 'winRate':
+      return formatWinRatePercent(row.wins, row.losses)
     case 'matches':
       return `${row.matchesPlayed} trận`
     case 'contribution':

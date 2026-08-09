@@ -9,8 +9,27 @@ import { normalizeParticipantName } from './showmatchParticipants'
 import type { PickleballEvent } from '../types'
 
 export type LeaderboardPeriod = 'today' | 'week' | 'month' | 'all'
-export type LeaderboardMetric = 'earnings' | 'wins' | 'matches' | 'contribution' | 'rating'
+export type LeaderboardMetric =
+  | 'earnings'
+  | 'wins'
+  | 'winRate'
+  | 'matches'
+  | 'contribution'
+  | 'rating'
 export type { LeaderboardSource } from './contributionStandings'
+
+/** Tỷ lệ thắng = thắng / (thắng + thua). Hòa không tính. */
+export function getWinRate(wins: number, losses: number): number {
+  const decided = wins + losses
+  if (decided <= 0) return 0
+  return wins / decided
+}
+
+export function formatWinRatePercent(wins: number, losses: number): string {
+  const rate = getWinRate(wins, losses)
+  const pct = Math.round(rate * 1000) / 10 // 1 chữ số thập phân nếu cần
+  return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`
+}
 
 export interface LeaderboardStanding extends ContributionStanding {
   trend: number | null
@@ -149,6 +168,8 @@ function metricValue(
       return row.totalAmount
     case 'wins':
       return row.wins
+    case 'winRate':
+      return getWinRate(row.wins, row.losses)
     case 'matches':
       return row.matchesPlayed
     case 'contribution':
@@ -163,6 +184,9 @@ function rowQualifies(
   metric: LeaderboardMetric,
   source: LeaderboardSource,
 ): boolean {
+  if (metric === 'winRate') {
+    return row.wins + row.losses > 0
+  }
   return metricValue(row, metric, source) > 0
 }
 
@@ -176,6 +200,10 @@ function sortRows(
     .sort((a, b) => {
       const diff = metricValue(b, metric, source) - metricValue(a, metric, source)
       if (diff !== 0) return diff
+      if (metric === 'winRate') {
+        if (b.wins !== a.wins) return b.wins - a.wins
+        if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed
+      }
       if (b.totalAmount !== a.totalAmount) return b.totalAmount - a.totalAmount
       if (b.wins !== a.wins) return b.wins - a.wins
       return a.displayName.localeCompare(b.displayName, 'vi')
@@ -187,6 +215,7 @@ function sortRows(
     eventsContributed: contributionCount(row, source),
     matchesPlayed: row.matchesPlayed,
     wins: row.wins,
+    losses: row.losses,
   }))
 }
 
@@ -199,6 +228,8 @@ function getRowMetricValue(
       return row.totalAmount
     case 'wins':
       return row.wins
+    case 'winRate':
+      return getWinRate(row.wins, row.losses)
     case 'matches':
       return row.matchesPlayed
     case 'contribution':
@@ -238,6 +269,8 @@ export function getStandingMetricValue(
       return row.totalAmount
     case 'wins':
       return row.wins
+    case 'winRate':
+      return getWinRate(row.wins, row.losses)
     case 'matches':
       return row.matchesPlayed
     case 'contribution':
@@ -268,6 +301,7 @@ function buildRatingStandings(
         eventsContributed: stats ? contributionCount(stats, 'tournament') : 0,
         matchesPlayed: row.matchesRated,
         wins: row.wins,
+        losses: row.losses,
         rating: row.rating,
         skillLevel: row.skillLevel,
       }

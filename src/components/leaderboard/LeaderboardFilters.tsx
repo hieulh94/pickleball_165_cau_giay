@@ -18,6 +18,7 @@ function metricOptions(source: LeaderboardSource): { id: LeaderboardMetric; labe
   const options: { id: LeaderboardMetric; label: string }[] = [
     { id: 'earnings', label: '🍺 Beer cống hiến' },
     { id: 'wins', label: '🏆 Thắng' },
+    { id: 'winRate', label: '📊 Tỷ lệ thắng' },
     { id: 'matches', label: '🎾 Trận' },
     {
       id: 'contribution',

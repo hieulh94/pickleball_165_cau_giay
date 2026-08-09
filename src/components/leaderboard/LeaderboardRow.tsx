@@ -1,4 +1,5 @@
 import {
+  formatWinRatePercent,
   getStandingMetricValue,
   type LeaderboardMetric,
   type LeaderboardSource,
@@ -20,6 +21,8 @@ function formatMetricLabel(
       return null
     case 'wins':
       return `${row.wins} thắng`
+    case 'winRate':
+      return `${formatWinRatePercent(row.wins, row.losses)} · ${row.wins}-${row.losses}`
     case 'matches':
       return `${row.matchesPlayed} trận`
     case 'contribution':
