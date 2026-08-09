@@ -17,6 +17,11 @@ const SOURCE_OPTIONS: { id: LeaderboardSource; label: string }[] = [
 function metricOptions(source: LeaderboardSource): { id: LeaderboardMetric; label: string }[] {
   const options: { id: LeaderboardMetric; label: string }[] = [
     { id: 'earnings', label: '🍺 Beer cống hiến' },
+    { id: 'avgPerMatch', label: '🍺 Beer / trận' },
+    {
+      id: 'avgPerContribution',
+      label: source === 'showmatch' ? '🍺 Beer / trận SM' : '🍺 Beer / mini game',
+    },
     { id: 'wins', label: '🏆 Thắng' },
     { id: 'winRate', label: '📊 Tỷ lệ thắng' },
     { id: 'matches', label: '🎾 Trận' },

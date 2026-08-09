@@ -1,6 +1,9 @@
 import { getPlayerAvatarColor, getPlayerInitials } from '../../lib/clubPlayers'
 import {
+  formatAvgAmount,
   formatWinRatePercent,
+  getAvgPerContribution,
+  getAvgPerMatch,
   type LeaderboardMetric,
   type LeaderboardSource,
   type LeaderboardStanding,
@@ -94,6 +97,8 @@ function formatPodiumMetric(
 ) {
   switch (metric) {
     case 'earnings':
+    case 'avgPerMatch':
+    case 'avgPerContribution':
       return null
     case 'wins':
       return `${row.wins} thắng`
@@ -173,6 +178,30 @@ function PodiumSlot({
                 iconClassName={place === 1 ? 'h-8 w-8 sm:h-11 sm:w-11' : 'h-7 w-7 sm:h-9 sm:w-9'}
                 className={styles.amount}
               />
+            ) : metric === 'avgPerMatch' ? (
+              <span className="inline-flex flex-col items-center gap-0.5">
+                <ContributionAmount
+                  amount={formatAvgAmount(getAvgPerMatch(row.totalAmount, row.matchesPlayed))}
+                  iconClassName={place === 1 ? 'h-8 w-8 sm:h-11 sm:w-11' : 'h-7 w-7 sm:h-9 sm:w-9'}
+                  className={styles.amount}
+                />
+                <span className="text-[10px] font-semibold text-text-secondary sm:text-xs">
+                  / trận
+                </span>
+              </span>
+            ) : metric === 'avgPerContribution' ? (
+              <span className="inline-flex flex-col items-center gap-0.5">
+                <ContributionAmount
+                  amount={formatAvgAmount(
+                    getAvgPerContribution(row.totalAmount, row.eventsContributed),
+                  )}
+                  iconClassName={place === 1 ? 'h-8 w-8 sm:h-11 sm:w-11' : 'h-7 w-7 sm:h-9 sm:w-9'}
+                  className={styles.amount}
+                />
+                <span className="text-[10px] font-semibold text-text-secondary sm:text-xs">
+                  {source === 'showmatch' ? '/ SM' : '/ mini game'}
+                </span>
+              </span>
             ) : (
               formatPodiumMetric(row, metric, source)
             )}

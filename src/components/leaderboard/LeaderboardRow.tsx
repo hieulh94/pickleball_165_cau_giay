@@ -1,5 +1,8 @@
 import {
+  formatAvgAmount,
   formatWinRatePercent,
+  getAvgPerContribution,
+  getAvgPerMatch,
   getStandingMetricValue,
   type LeaderboardMetric,
   type LeaderboardSource,
@@ -11,6 +14,25 @@ import { LeaderboardProgressBar } from './LeaderboardProgressBar'
 import { PlayerAvatar, PlayerStats } from './LeaderboardPodium'
 import { LargeRankBadge, RankTrendBadge } from './RankTrendBadge'
 
+function AvgBeerMetric({
+  amount,
+  suffix,
+  iconClassName,
+  className,
+}: {
+  amount: number
+  suffix: string
+  iconClassName?: string
+  className?: string
+}) {
+  return (
+    <span className={cn('inline-flex items-baseline gap-1', className)}>
+      <ContributionAmount amount={formatAvgAmount(amount)} iconClassName={iconClassName} />
+      <span className="text-sm font-semibold text-text-secondary">{suffix}</span>
+    </span>
+  )
+}
+
 function formatMetricLabel(
   row: LeaderboardStanding,
   metric: LeaderboardMetric,
@@ -18,6 +40,8 @@ function formatMetricLabel(
 ): string | null {
   switch (metric) {
     case 'earnings':
+    case 'avgPerMatch':
+    case 'avgPerContribution':
       return null
     case 'wins':
       return `${row.wins} thắng`
@@ -86,16 +110,42 @@ export function LeaderboardRow({ row, metric, source, maxMetricValue, onSelect }
                 iconClassName="h-6 w-6 sm:h-7 sm:w-7"
                 className="text-xl font-bold text-text-primary"
               />
+            ) : metric === 'avgPerMatch' ? (
+              <AvgBeerMetric
+                amount={getAvgPerMatch(row.totalAmount, row.matchesPlayed)}
+                suffix="/ trận"
+                iconClassName="h-6 w-6 sm:h-7 sm:w-7"
+                className="text-xl font-bold text-text-primary"
+              />
+            ) : metric === 'avgPerContribution' ? (
+              <AvgBeerMetric
+                amount={getAvgPerContribution(row.totalAmount, row.eventsContributed)}
+                suffix={source === 'showmatch' ? '/ SM' : '/ MG'}
+                iconClassName="h-6 w-6 sm:h-7 sm:w-7"
+                className="text-xl font-bold text-text-primary"
+              />
             ) : (
               <p className="text-xl font-bold tabular-nums text-text-primary">
                 {formatMetricLabel(row, metric, source)}
               </p>
             )}
-            {metric !== 'earnings' && row.totalAmount > 0 && (
+            {metric !== 'earnings' &&
+              metric !== 'avgPerMatch' &&
+              metric !== 'avgPerContribution' &&
+              row.totalAmount > 0 && (
               <p className="text-xs text-text-secondary">
                 <ContributionAmount
                   amount={row.totalAmount}
                   iconClassName="h-6 w-6 sm:h-7 sm:w-7"
+                />
+              </p>
+            )}
+            {(metric === 'avgPerMatch' || metric === 'avgPerContribution') && (
+              <p className="text-xs text-text-secondary">
+                Tổng{' '}
+                <ContributionAmount
+                  amount={row.totalAmount}
+                  iconClassName="h-4 w-4"
                 />
               </p>
             )}

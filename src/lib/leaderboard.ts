@@ -15,6 +15,8 @@ export type LeaderboardMetric =
   | 'winRate'
   | 'matches'
   | 'contribution'
+  | 'avgPerMatch'
+  | 'avgPerContribution'
   | 'rating'
 export type { LeaderboardSource } from './contributionStandings'
 
@@ -29,6 +31,24 @@ export function formatWinRatePercent(wins: number, losses: number): string {
   const rate = getWinRate(wins, losses)
   const pct = Math.round(rate * 1000) / 10 // 1 chữ số thập phân nếu cần
   return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(1)}%`
+}
+
+/** Beer trung bình mỗi trận đã chơi. */
+export function getAvgPerMatch(totalAmount: number, matchesPlayed: number): number {
+  if (matchesPlayed <= 0 || totalAmount <= 0) return 0
+  return totalAmount / matchesPlayed
+}
+
+/** Beer trung bình mỗi mini game / trận SM có đóng góp. */
+export function getAvgPerContribution(totalAmount: number, contributionCount: number): number {
+  if (contributionCount <= 0 || totalAmount <= 0) return 0
+  return totalAmount / contributionCount
+}
+
+/** Làm tròn số beer trung bình để hiện UI. */
+export function formatAvgAmount(amount: number): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  return Math.round(amount * 10) / 10
 }
 
 export interface LeaderboardStanding extends ContributionStanding {
@@ -174,6 +194,10 @@ function metricValue(
       return row.matchesPlayed
     case 'contribution':
       return contributionCount(row, source)
+    case 'avgPerMatch':
+      return getAvgPerMatch(row.totalAmount, row.matchesPlayed)
+    case 'avgPerContribution':
+      return getAvgPerContribution(row.totalAmount, contributionCount(row, source))
     case 'rating':
       return 0
   }
@@ -186,6 +210,12 @@ function rowQualifies(
 ): boolean {
   if (metric === 'winRate') {
     return row.wins + row.losses > 0
+  }
+  if (metric === 'avgPerMatch') {
+    return row.totalAmount > 0 && row.matchesPlayed > 0
+  }
+  if (metric === 'avgPerContribution') {
+    return row.totalAmount > 0 && contributionCount(row, source) > 0
   }
   return metricValue(row, metric, source) > 0
 }
@@ -202,6 +232,10 @@ function sortRows(
       if (diff !== 0) return diff
       if (metric === 'winRate') {
         if (b.wins !== a.wins) return b.wins - a.wins
+        if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed
+      }
+      if (metric === 'avgPerMatch' || metric === 'avgPerContribution') {
+        if (b.totalAmount !== a.totalAmount) return b.totalAmount - a.totalAmount
         if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed
       }
       if (b.totalAmount !== a.totalAmount) return b.totalAmount - a.totalAmount
@@ -234,6 +268,10 @@ function getRowMetricValue(
       return row.matchesPlayed
     case 'contribution':
       return row.eventsContributed
+    case 'avgPerMatch':
+      return getAvgPerMatch(row.totalAmount, row.matchesPlayed)
+    case 'avgPerContribution':
+      return getAvgPerContribution(row.totalAmount, row.eventsContributed)
     case 'rating':
       return row.rating ?? 0
   }
@@ -275,6 +313,10 @@ export function getStandingMetricValue(
       return row.matchesPlayed
     case 'contribution':
       return row.eventsContributed
+    case 'avgPerMatch':
+      return getAvgPerMatch(row.totalAmount, row.matchesPlayed)
+    case 'avgPerContribution':
+      return getAvgPerContribution(row.totalAmount, row.eventsContributed)
     case 'rating':
       return row.rating ?? 0
   }
