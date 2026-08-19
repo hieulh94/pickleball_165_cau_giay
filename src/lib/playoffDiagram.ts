@@ -10,15 +10,15 @@ export interface PlayoffDiagramEdge {
 }
 
 export const DIAGRAM_CARD_WIDTH = 252
-export const DIAGRAM_CARD_HEIGHT = 128
+export const DIAGRAM_CARD_HEIGHT = 148
 export const DIAGRAM_COL_GAP = 108
 export const DIAGRAM_PAD_X = 20
-export const DIAGRAM_PAD_Y = 36
-const DIAGRAM_CARD_GAP = 56
-const PORT_IN1_Y = 50
-const PORT_IN2_Y = 96
-const PORT_WIN_Y = 48
-const PORT_LOSE_Y = 94
+export const DIAGRAM_PAD_Y = 40
+const DIAGRAM_CARD_GAP = 80
+const PORT_IN1_Y = 56
+const PORT_IN2_Y = 108
+const PORT_WIN_Y = 54
+const PORT_LOSE_Y = 106
 
 export interface PlayoffDiagramNodePos {
   matchId: string
@@ -374,7 +374,7 @@ export function layoutTrackPositions(track: PlayoffDiagramTrack): {
         .filter((y): y is number => y !== undefined)
       yById.set(id, parents.length > 0 ? average(parents) : 0)
     }
-    resolveOverlaps(wFed, yById, 36)
+    resolveOverlaps(wFed, yById, DIAGRAM_CARD_GAP)
 
     const winnerBottom =
       wFed.length > 0
@@ -386,11 +386,11 @@ export function layoutTrackPositions(track: PlayoffDiagramTrack): {
         .filter((edge) => edge.kind === 'L')
         .map((edge) => yById.get(edge.fromId))
         .filter((y): y is number => y !== undefined)
-      const preferred = parents.length > 0 ? average(parents) : winnerBottom + 48
-      const stacked = winnerBottom + 48 + index * (DIAGRAM_CARD_HEIGHT + 32)
+      const preferred = parents.length > 0 ? average(parents) : winnerBottom + DIAGRAM_CARD_GAP
+      const stacked = winnerBottom + DIAGRAM_CARD_GAP + index * (DIAGRAM_CARD_HEIGHT + DIAGRAM_CARD_GAP)
       yById.set(id, Math.max(preferred, stacked))
     })
-    resolveOverlaps([...wFed, ...lFed], yById, 40)
+    resolveOverlaps([...wFed, ...lFed], yById, DIAGRAM_CARD_GAP)
   })
 
   const positions = new Map<string, PlayoffDiagramNodePos>()

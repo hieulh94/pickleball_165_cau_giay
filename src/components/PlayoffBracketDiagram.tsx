@@ -5,6 +5,7 @@ import {
   collectPlayoffSeedAppearances,
   describeFeedSource,
   DIAGRAM_CARD_WIDTH,
+  DIAGRAM_CARD_HEIGHT,
   DIAGRAM_COL_GAP,
   DIAGRAM_PAD_X,
   formatGroupSeed,
@@ -401,7 +402,7 @@ function DiagramMatchCard({
     <article
       data-diagram-match={match.id}
       className={cn(
-        'relative w-[252px] min-h-[128px] rounded-2xl border px-2.5 py-2 shadow-[0_0_24px_rgba(34,211,238,0.08)]',
+        'relative w-[252px] min-h-[148px] rounded-2xl border px-2.5 py-2 shadow-[0_0_24px_rgba(34,211,238,0.08)]',
         match.completed
           ? 'border-emerald-400/60 bg-slate-900/95'
           : 'border-cyan-400/40 bg-slate-900/95',
@@ -493,63 +494,66 @@ function TrackFlow({
       <div
         data-export-expand
         data-diagram-zoom-frame
-        className="relative overflow-hidden"
+        className="relative"
         style={{ width: layout.width * zoom, height: canvasHeight * zoom }}
       >
-        <div
-          data-diagram-zoom
-          className="relative origin-top-left"
-          style={{
-            width: layout.width,
-            height: canvasHeight,
-            transform: `scale(${zoom})`,
-          }}
+        {track.columns.map((column, index) =>
+          column.label ? (
+            <p
+              key={`${track.id}-h-${index}`}
+              className="pointer-events-none absolute z-20 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-300"
+              style={{
+                left: (DIAGRAM_PAD_X + index * (DIAGRAM_CARD_WIDTH + DIAGRAM_COL_GAP)) * zoom,
+                width: DIAGRAM_CARD_WIDTH * zoom,
+                top: 4 * zoom,
+              }}
+            >
+              {column.label}
+            </p>
+          ) : null,
+        )}
+
+        <svg
+          className="pointer-events-none absolute left-0 top-0 z-0"
+          width={layout.width * zoom}
+          height={canvasHeight * zoom}
+          viewBox={`0 0 ${layout.width} ${canvasHeight}`}
+          preserveAspectRatio="xMinYMin meet"
+          aria-hidden
         >
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
-            {track.columns.map((column, index) =>
-              column.label ? (
-                <p
-                  key={`${track.id}-h-${index}`}
-                  className="absolute text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-300"
-                  style={{
-                    left: DIAGRAM_PAD_X + index * (DIAGRAM_CARD_WIDTH + DIAGRAM_COL_GAP),
-                    width: DIAGRAM_CARD_WIDTH,
-                    textAlign: 'center',
-                  }}
-                >
-                  {column.label}
-                </p>
-              ) : null,
-            )}
-          </div>
+          {connectors.map((connector, index) => (
+            <path
+              key={`${connector.kind}-${index}`}
+              d={connector.path}
+              fill="none"
+              stroke={connector.kind === 'W' ? '#34d399' : '#fbbf24'}
+              strokeWidth="2.25"
+              strokeLinecap="round"
+              strokeOpacity={connector.kind === 'W' ? 0.95 : 0.85}
+            />
+          ))}
+        </svg>
 
-          <svg
-            className="pointer-events-none absolute inset-0 z-0"
-            width={layout.width}
-            height={canvasHeight}
-            aria-hidden
-          >
-            {connectors.map((connector, index) => (
-              <path
-                key={`${connector.kind}-${index}`}
-                d={connector.path}
-                fill="none"
-                stroke={connector.kind === 'W' ? '#34d399' : '#fbbf24'}
-                strokeWidth="2.25"
-                strokeLinecap="round"
-                strokeOpacity={connector.kind === 'W' ? 0.95 : 0.85}
-              />
-            ))}
-          </svg>
-
-          {[...layout.positions.values()].map((pos) => {
-            const match = matchesById.get(pos.matchId)
-            if (!match) return null
-            return (
+        {[...layout.positions.values()].map((pos) => {
+          const match = matchesById.get(pos.matchId)
+          if (!match) return null
+          return (
+            <div
+              key={match.id}
+              className="absolute z-10 overflow-hidden"
+              style={{
+                left: pos.x * zoom,
+                top: pos.y * zoom,
+                width: DIAGRAM_CARD_WIDTH * zoom,
+                height: DIAGRAM_CARD_HEIGHT * zoom,
+              }}
+            >
               <div
-                key={match.id}
-                className="absolute z-10"
-                style={{ left: pos.x, top: pos.y }}
+                style={{
+                  width: DIAGRAM_CARD_WIDTH,
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left',
+                }}
               >
                 <DiagramMatchCard
                   match={match}
@@ -560,9 +564,9 @@ function TrackFlow({
                   stageLabel={groupLabelByMatch.get(match.id)}
                 />
               </div>
-            )
-          })}
-        </div>
+            </div>
+          )
+        })}
       </div>
     </section>
   )
@@ -590,6 +594,7 @@ export function PlayoffBracketDiagramDialog({
 }: PlayoffBracketDiagramDialogProps) {
   const exportRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [imagePreview, setImagePreview] = useState<{
     url: string
@@ -645,10 +650,16 @@ export function PlayoffBracketDiagramDialog({
   }
 
   const handleDownloadImage = async () => {
-    const node = exportRef.current
-    if (!node || downloading || tracks.length === 0) return
+    if (downloading || tracks.length === 0) return
     setDownloading(true)
+    setExporting(true)
     try {
+      await waitAnimationFrames(3)
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 50)
+      })
+      const node = exportRef.current
+      if (!node) throw new Error('missing diagram')
       const blob = await captureDiagramPng(node)
       const fileName = `so-do-playoff-${todayStamp()}.png`
       if (isIosDevice()) {
@@ -659,6 +670,7 @@ export function PlayoffBracketDiagramDialog({
     } catch {
       alert('Không tải được ảnh. Thử lại.')
     } finally {
+      setExporting(false)
       setDownloading(false)
     }
   }
@@ -779,7 +791,7 @@ export function PlayoffBracketDiagramDialog({
                   pairs={pairs}
                   participants={participants}
                   pairNumberById={pairNumberById}
-                  zoom={zoom}
+                  zoom={exporting ? 1 : zoom}
                 />
               ))
             )}
