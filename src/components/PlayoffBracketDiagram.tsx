@@ -54,16 +54,21 @@ function prepareExportLayout(root: HTMLElement): () => void {
     el.style.overflow = 'visible'
     el.style.maxHeight = 'none'
     el.style.maxWidth = 'none'
+    el.style.minHeight = '0'
+    el.style.flex = 'none'
     if (extra) Object.assign(el.style, extra)
   }
 
   remember(root)
+  root.style.alignSelf = 'flex-start'
   root.style.width = 'max-content'
   root.style.minWidth = 'max-content'
   root.style.maxWidth = 'none'
   root.style.maxHeight = 'none'
   root.style.height = 'auto'
+  root.style.minHeight = 'auto'
   root.style.overflow = 'visible'
+  root.style.flex = 'none'
 
   unlock(root.querySelector('[data-export-body]'), {
     display: 'flex',
@@ -71,6 +76,7 @@ function prepareExportLayout(root: HTMLElement): () => void {
     alignItems: 'flex-start',
     width: 'max-content',
     height: 'auto',
+    minHeight: 'auto',
   })
 
   unlock(root.querySelector('[data-export-groups]'), {
@@ -91,6 +97,7 @@ function prepareExportLayout(root: HTMLElement): () => void {
     groupsList.style.maxHeight = 'none'
     groupsList.style.overflow = 'visible'
     groupsList.style.height = 'auto'
+    groupsList.style.minHeight = 'auto'
   }
 
   unlock(root.querySelector('[data-export-tracks]'), {
@@ -98,6 +105,7 @@ function prepareExportLayout(root: HTMLElement): () => void {
     flexDirection: 'column',
     width: 'max-content',
     height: 'auto',
+    minHeight: 'auto',
   })
 
   root.querySelectorAll<HTMLElement>('[data-diagram-zoom-frame]').forEach((frame) => {
@@ -108,6 +116,32 @@ function prepareExportLayout(root: HTMLElement): () => void {
 
   return () => {
     for (const [el, css] of previous) el.style.cssText = css
+  }
+}
+
+function measureExportSize(root: HTMLElement): { width: number; height: number } {
+  const rootRect = root.getBoundingClientRect()
+  let width = Math.max(root.scrollWidth, root.offsetWidth)
+  let height = Math.max(root.scrollHeight, root.offsetHeight)
+
+  const include = (el: HTMLElement) => {
+    const rect = el.getBoundingClientRect()
+    width = Math.max(width, Math.ceil(rect.right - rootRect.left))
+    height = Math.max(height, Math.ceil(rect.bottom - rootRect.top))
+    width = Math.max(width, el.offsetLeft + el.offsetWidth)
+    height = Math.max(height, el.offsetTop + el.offsetHeight)
+  }
+
+  include(root)
+  root
+    .querySelectorAll<HTMLElement>(
+      '[data-export-body], [data-export-groups], [data-export-tracks], [data-diagram-zoom-frame]',
+    )
+    .forEach(include)
+
+  return {
+    width: Math.max(1, Math.ceil(width) + 16),
+    height: Math.max(1, Math.ceil(height) + 16),
   }
 }
 
@@ -127,16 +161,24 @@ async function captureDiagramPng(node: HTMLElement): Promise<Blob> {
       window.setTimeout(resolve, 80)
     })
     const { domToBlob } = await import('modern-screenshot')
-    const width = Math.ceil(Math.max(node.scrollWidth, node.offsetWidth, 1))
-    const height = Math.ceil(Math.max(node.scrollHeight, node.offsetHeight, 1))
+    const { width, height } = measureExportSize(node)
     const ios = isIosDevice()
     const maxCanvas = ios ? 4096 : 8192
-    const scale = Math.max(1, Math.min(2, maxCanvas / width, maxCanvas / height))
+    const scale = Math.min(2, maxCanvas / width, maxCanvas / height)
     const blob = await domToBlob(node, {
       scale,
+      width,
+      height,
       backgroundColor: '#070b14',
       font: false,
       maximumCanvasSize: maxCanvas,
+      style: {
+        width: `${width}px`,
+        height: `${height}px`,
+        overflow: 'visible',
+        maxWidth: 'none',
+        maxHeight: 'none',
+      },
       filter: (el) => !(el instanceof HTMLElement && el.hasAttribute('data-export-hide')),
     })
     if (!blob || blob.size === 0) {
