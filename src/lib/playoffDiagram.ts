@@ -11,7 +11,7 @@ export interface PlayoffDiagramEdge {
 
 export const DIAGRAM_CARD_WIDTH = 252
 export const DIAGRAM_CARD_HEIGHT = 148
-export const DIAGRAM_COL_GAP = 108
+export const DIAGRAM_COL_GAP = 148
 export const DIAGRAM_PAD_X = 20
 export const DIAGRAM_PAD_Y = 40
 const DIAGRAM_CARD_GAP = 80
@@ -290,39 +290,151 @@ function roundedOrtho(x1: number, y1: number, x2: number, y2: number, busX: numb
   ].join(' ')
 }
 
+const BUS_MARGIN = 20
+const BUS_SPACING = 14
+const BUS_KIND_GUTTER = 18
+
+function series(start: number, count: number, step: number, dir: 1 | -1): number[] {
+  return Array.from({ length: count }, (_, i) => start + dir * i * step)
+}
+
+function allocateGapBuses(
+  left: number,
+  right: number,
+  winCount: number,
+  loseCount: number,
+): { win: number[]; lose: number[] } {
+  const span = Math.max(0, right - left)
+  const gutter = winCount > 0 && loseCount > 0 ? BUS_KIND_GUTTER : 0
+  const slots = Math.max(0, winCount - 1) + Math.max(0, loseCount - 1)
+  let step = BUS_SPACING
+  if (slots > 0 && slots * step + gutter > span) {
+    step = Math.max(8, (span - gutter) / slots)
+  }
+  return {
+    win: series(left, winCount, step, 1),
+    lose: series(right, loseCount, step, -1),
+  }
+}
+
+function connectorKey(edge: PlayoffDiagramEdge): string {
+  return `${edge.kind}:${edge.fromId}->${edge.toId}:${edge.toSlot ?? 0}`
+}
+
+export const WINNER_CONNECTOR_COLOR = '#059669'
+
+/** Mỗi trận đích (hai cặp thua gặp nhau) dùng một màu. */
+export const LOSER_CONNECTOR_COLORS = [
+  '#d97706',
+  '#db2777',
+  '#7c3aed',
+  '#ea580c',
+  '#0284c7',
+  '#4f46e5',
+  '#c026d3',
+  '#b45309',
+] as const
+
 export interface PlayoffDiagramConnector {
   path: string
   kind: PlayoffDiagramEdgeKind
+  color: string
 }
 
 export function buildTrackConnectors(
   track: PlayoffDiagramTrack,
   positions: Map<string, PlayoffDiagramNodePos>,
 ): PlayoffDiagramConnector[] {
-  const busByDest = new Map<string, { W: number; L: number }>()
-  for (const edge of track.edges) {
-    const from = positions.get(edge.fromId)
-    if (!from) continue
-    const fromRight = from.x + DIAGRAM_CARD_WIDTH
-    const current = busByDest.get(edge.toId) ?? { W: fromRight + 22, L: fromRight + 46 }
-    if (edge.kind === 'W') current.W = Math.min(current.W, fromRight + 22)
-    else current.L = Math.min(current.L, fromRight + 48)
-    busByDest.set(edge.toId, current)
-  }
-
-  const connectors: PlayoffDiagramConnector[] = []
-  for (const edge of track.edges) {
+  const ready = track.edges.flatMap((edge) => {
     const from = positions.get(edge.fromId)
     const to = positions.get(edge.toId)
-    if (!from || !to) continue
+    return from && to ? [{ edge, from, to }] : []
+  })
+
+  const byFromColumn = new Map<number, typeof ready>()
+  for (const item of ready) {
+    const list = byFromColumn.get(item.from.column) ?? []
+    list.push(item)
+    byFromColumn.set(item.from.column, list)
+  }
+
+  const busX = new Map<string, number>()
+  for (const items of byFromColumn.values()) {
+    const fromRight = items[0]!.from.x + DIAGRAM_CARD_WIDTH
+    const toLeft = Math.min(...items.map((item) => item.to.x))
+    const winDests: string[] = []
+    for (const item of items) {
+      if (item.edge.kind !== 'W') continue
+      if (!winDests.includes(item.edge.toId)) winDests.push(item.edge.toId)
+    }
+    winDests.sort(
+      (a, b) => (positions.get(a)?.y ?? 0) - (positions.get(b)?.y ?? 0),
+    )
+    const loseItems = items
+      .filter((item) => item.edge.kind === 'L')
+      .sort(
+        (a, b) =>
+          a.from.y - b.from.y ||
+          a.to.y - b.to.y ||
+          (a.edge.toSlot ?? 0) - (b.edge.toSlot ?? 0),
+      )
+
+    const { win, lose } = allocateGapBuses(
+      fromRight + BUS_MARGIN,
+      toLeft - BUS_MARGIN,
+      winDests.length,
+      loseItems.length,
+    )
+    const winByDest = new Map(winDests.map((id, index) => [id, win[index]!]))
+    for (const item of items) {
+      if (item.edge.kind !== 'W') continue
+      busX.set(
+        connectorKey(item.edge),
+        winByDest.get(item.edge.toId) ?? fromRight + BUS_MARGIN,
+      )
+    }
+    loseItems.forEach((item, index) => {
+      busX.set(connectorKey(item.edge), lose[index] ?? toLeft - BUS_MARGIN)
+    })
+  }
+
+  const loseDests: string[] = []
+  for (const item of ready) {
+    if (item.edge.kind !== 'L') continue
+    if (!loseDests.includes(item.edge.toId)) loseDests.push(item.edge.toId)
+  }
+  loseDests.sort((a, b) => {
+    const pa = positions.get(a)
+    const pb = positions.get(b)
+    return (pa?.column ?? 0) - (pb?.column ?? 0) || (pa?.y ?? 0) - (pb?.y ?? 0)
+  })
+  const loseColorByDest = new Map(
+    loseDests.map((id, index) => [
+      id,
+      LOSER_CONNECTOR_COLORS[index % LOSER_CONNECTOR_COLORS.length],
+    ]),
+  )
+
+  const connectors: PlayoffDiagramConnector[] = []
+  const ordered = [...ready].sort((a, b) =>
+    a.edge.kind === b.edge.kind ? 0 : a.edge.kind === 'L' ? 1 : -1,
+  )
+  for (const { edge, from, to } of ordered) {
     const startY = from.y + (edge.kind === 'W' ? PORT_WIN_Y : PORT_LOSE_Y)
     const endY = to.y + ((edge.toSlot ?? 1) === 2 ? PORT_IN2_Y : PORT_IN1_Y)
-    const bus = busByDest.get(edge.toId)
-    const busX =
-      edge.kind === 'W' ? (bus?.W ?? from.x + DIAGRAM_CARD_WIDTH + 22) : (bus?.L ?? from.x + DIAGRAM_CARD_WIDTH + 48)
     connectors.push({
       kind: edge.kind,
-      path: roundedOrtho(from.x + DIAGRAM_CARD_WIDTH, startY, to.x, endY, busX),
+      color:
+        edge.kind === 'W'
+          ? WINNER_CONNECTOR_COLOR
+          : (loseColorByDest.get(edge.toId) ?? LOSER_CONNECTOR_COLORS[0]),
+      path: roundedOrtho(
+        from.x + DIAGRAM_CARD_WIDTH,
+        startY,
+        to.x,
+        endY,
+        busX.get(connectorKey(edge)) ?? from.x + DIAGRAM_CARD_WIDTH + 36,
+      ),
     })
   }
   return connectors

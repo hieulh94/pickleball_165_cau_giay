@@ -548,7 +548,7 @@ function TrackFlow({
               key={`${connector.kind}-${index}`}
               d={connector.path}
               fill="none"
-              stroke={connector.kind === 'W' ? '#059669' : '#d97706'}
+              stroke={connector.color}
               strokeWidth="2.25"
               strokeLinecap="round"
               strokeOpacity={connector.kind === 'W' ? 0.95 : 0.9}
@@ -726,7 +726,7 @@ export function PlayoffBracketDiagramDialog({
               Sơ đồ playoff
             </h3>
             <p className="mt-0.5 hidden text-xs text-neutral-500 sm:block">
-              Thắng đi tiếp (xanh) · thua sang nhánh phụ (vàng) — trận sau nằm giữa hai trận nuôi
+              Thắng đi tiếp (xanh) · thua gặp nhau thì cùng màu — trận sau nằm giữa hai trận nuôi
             </p>
             {isPreview && (
               <p className="mt-1 text-[11px] text-amber-700 sm:text-xs">
