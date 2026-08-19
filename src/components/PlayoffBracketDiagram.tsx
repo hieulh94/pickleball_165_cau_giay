@@ -47,66 +47,42 @@ function prepareExportLayout(root: HTMLElement): () => void {
   const remember = (el: HTMLElement) => {
     if (!previous.has(el)) previous.set(el, el.style.cssText)
   }
-  const elements = [
-    root,
-    ...root.querySelectorAll<HTMLElement>(
-      '[data-export-expand], [data-diagram-zoom], [data-diagram-zoom-frame]',
-    ),
-  ]
-  for (const el of elements) {
+
+  const unlock = (el: HTMLElement | null, extra?: Partial<CSSStyleDeclaration>) => {
+    if (!el) return
     remember(el)
     el.style.overflow = 'visible'
     el.style.maxHeight = 'none'
     el.style.maxWidth = 'none'
-    el.style.height = 'auto'
-    if (getComputedStyle(el).display === 'none') {
-      el.style.display = 'block'
-    }
+    if (extra) Object.assign(el.style, extra)
   }
-
-  root.querySelectorAll<HTMLElement>('[data-diagram-zoom]').forEach((el) => {
-    remember(el)
-    el.style.transform = 'none'
-  })
-  root.querySelectorAll<HTMLElement>('[data-diagram-zoom-frame]').forEach((frame) => {
-    remember(frame)
-    const inner = frame.querySelector<HTMLElement>('[data-diagram-zoom]')
-    if (!inner) return
-    frame.style.width = inner.style.width || `${inner.offsetWidth}px`
-    frame.style.height = inner.style.height || `${inner.offsetHeight}px`
-  })
 
   remember(root)
   root.style.width = 'max-content'
   root.style.minWidth = 'max-content'
   root.style.maxWidth = 'none'
+  root.style.maxHeight = 'none'
   root.style.height = 'auto'
   root.style.overflow = 'visible'
 
-  const body = root.querySelector<HTMLElement>('[data-export-body]')
-  if (body) {
-    remember(body)
-    body.style.display = 'flex'
-    body.style.flexDirection = 'row'
-    body.style.alignItems = 'flex-start'
-    body.style.width = 'max-content'
-    body.style.height = 'auto'
-    body.style.overflow = 'visible'
-  }
+  unlock(root.querySelector('[data-export-body]'), {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    width: 'max-content',
+    height: 'auto',
+  })
 
-  const groups = root.querySelector<HTMLElement>('[data-export-groups]')
-  if (groups) {
-    remember(groups)
-    groups.style.display = 'flex'
-    groups.style.flexDirection = 'column'
-    groups.style.width = '280px'
-    groups.style.minWidth = '280px'
-    groups.style.maxWidth = '280px'
-    groups.style.height = 'auto'
-    groups.style.maxHeight = 'none'
-    groups.style.borderBottom = 'none'
-    groups.style.borderRight = '1px solid rgba(255,255,255,0.12)'
-  }
+  unlock(root.querySelector('[data-export-groups]'), {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '280px',
+    minWidth: '280px',
+    maxWidth: '280px',
+    height: 'auto',
+    borderBottom: 'none',
+    borderRight: '1px solid rgba(255,255,255,0.12)',
+  })
 
   const groupsList = root.querySelector<HTMLElement>('[data-export-groups-list]')
   if (groupsList) {
@@ -117,15 +93,18 @@ function prepareExportLayout(root: HTMLElement): () => void {
     groupsList.style.height = 'auto'
   }
 
-  const tracks = root.querySelector<HTMLElement>('[data-export-tracks]')
-  if (tracks) {
-    remember(tracks)
-    tracks.style.display = 'flex'
-    tracks.style.flexDirection = 'column'
-    tracks.style.width = 'max-content'
-    tracks.style.height = 'auto'
-    tracks.style.overflow = 'visible'
-  }
+  unlock(root.querySelector('[data-export-tracks]'), {
+    display: 'flex',
+    flexDirection: 'column',
+    width: 'max-content',
+    height: 'auto',
+  })
+
+  root.querySelectorAll<HTMLElement>('[data-diagram-zoom-frame]').forEach((frame) => {
+    remember(frame)
+    frame.style.overflow = 'visible'
+    frame.style.flexShrink = '0'
+  })
 
   return () => {
     for (const [el, css] of previous) el.style.cssText = css
@@ -156,8 +135,6 @@ async function captureDiagramPng(node: HTMLElement): Promise<Blob> {
     const blob = await domToBlob(node, {
       scale,
       backgroundColor: '#070b14',
-      width,
-      height,
       font: false,
       maximumCanvasSize: maxCanvas,
       filter: (el) => !(el instanceof HTMLElement && el.hasAttribute('data-export-hide')),
@@ -492,9 +469,8 @@ function TrackFlow({
       </div>
 
       <div
-        data-export-expand
         data-diagram-zoom-frame
-        className="relative"
+        className="relative shrink-0"
         style={{ width: layout.width * zoom, height: canvasHeight * zoom }}
       >
         {track.columns.map((column, index) =>
