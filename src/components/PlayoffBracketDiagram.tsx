@@ -46,15 +46,19 @@ function isIosDevice(): boolean {
   return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
 }
 
-function unlockExportOverflow(root: HTMLElement): () => void {
+function prepareExportLayout(root: HTMLElement): () => void {
+  const previous = new Map<HTMLElement, string>()
+  const remember = (el: HTMLElement) => {
+    if (!previous.has(el)) previous.set(el, el.style.cssText)
+  }
   const elements = [
     root,
     ...root.querySelectorAll<HTMLElement>(
       '[data-export-expand], [data-diagram-zoom], [data-diagram-zoom-frame]',
     ),
   ]
-  const previous = elements.map((el) => [el, el.style.cssText] as const)
   for (const el of elements) {
+    remember(el)
     el.style.overflow = 'visible'
     el.style.maxHeight = 'none'
     el.style.maxWidth = 'none'
@@ -63,17 +67,70 @@ function unlockExportOverflow(root: HTMLElement): () => void {
       el.style.display = 'block'
     }
   }
+
   root.querySelectorAll<HTMLElement>('[data-diagram-zoom]').forEach((el) => {
+    remember(el)
     el.style.transform = 'none'
   })
   root.querySelectorAll<HTMLElement>('[data-diagram-zoom-frame]').forEach((frame) => {
+    remember(frame)
     const inner = frame.querySelector<HTMLElement>('[data-diagram-zoom]')
     if (!inner) return
     frame.style.width = inner.style.width || `${inner.offsetWidth}px`
     frame.style.height = inner.style.height || `${inner.offsetHeight}px`
   })
+
+  remember(root)
   root.style.width = 'max-content'
-  root.style.minWidth = '100%'
+  root.style.minWidth = 'max-content'
+  root.style.maxWidth = 'none'
+  root.style.height = 'auto'
+  root.style.overflow = 'visible'
+
+  const body = root.querySelector<HTMLElement>('[data-export-body]')
+  if (body) {
+    remember(body)
+    body.style.display = 'flex'
+    body.style.flexDirection = 'row'
+    body.style.alignItems = 'flex-start'
+    body.style.width = 'max-content'
+    body.style.height = 'auto'
+    body.style.overflow = 'visible'
+  }
+
+  const groups = root.querySelector<HTMLElement>('[data-export-groups]')
+  if (groups) {
+    remember(groups)
+    groups.style.display = 'flex'
+    groups.style.flexDirection = 'column'
+    groups.style.width = '280px'
+    groups.style.minWidth = '280px'
+    groups.style.maxWidth = '280px'
+    groups.style.height = 'auto'
+    groups.style.maxHeight = 'none'
+    groups.style.borderBottom = 'none'
+    groups.style.borderRight = '1px solid rgba(255,255,255,0.12)'
+  }
+
+  const groupsList = root.querySelector<HTMLElement>('[data-export-groups-list]')
+  if (groupsList) {
+    remember(groupsList)
+    groupsList.style.display = 'block'
+    groupsList.style.maxHeight = 'none'
+    groupsList.style.overflow = 'visible'
+    groupsList.style.height = 'auto'
+  }
+
+  const tracks = root.querySelector<HTMLElement>('[data-export-tracks]')
+  if (tracks) {
+    remember(tracks)
+    tracks.style.display = 'flex'
+    tracks.style.flexDirection = 'column'
+    tracks.style.width = 'max-content'
+    tracks.style.height = 'auto'
+    tracks.style.overflow = 'visible'
+  }
+
   return () => {
     for (const [el, css] of previous) el.style.cssText = css
   }
@@ -88,20 +145,25 @@ async function waitAnimationFrames(count: number): Promise<void> {
 }
 
 async function captureDiagramPng(node: HTMLElement): Promise<Blob> {
-  const restore = unlockExportOverflow(node)
+  const restore = prepareExportLayout(node)
   try {
-    await waitAnimationFrames(2)
+    await waitAnimationFrames(4)
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 80)
+    })
     const { domToBlob } = await import('modern-screenshot')
-    const width = Math.ceil(Math.max(node.scrollWidth, node.offsetWidth))
-    const height = Math.ceil(Math.max(node.scrollHeight, node.offsetHeight))
+    const width = Math.ceil(Math.max(node.scrollWidth, node.offsetWidth, 1))
+    const height = Math.ceil(Math.max(node.scrollHeight, node.offsetHeight, 1))
     const ios = isIosDevice()
+    const maxCanvas = ios ? 4096 : 8192
+    const scale = Math.max(1, Math.min(2, maxCanvas / width, maxCanvas / height))
     const blob = await domToBlob(node, {
-      scale: ios ? 1 : 2,
+      scale,
       backgroundColor: '#070b14',
       width,
       height,
       font: false,
-      maximumCanvasSize: ios ? 4096 : 8192,
+      maximumCanvasSize: maxCanvas,
       filter: (el) => !(el instanceof HTMLElement && el.hasAttribute('data-export-hide')),
     })
     if (!blob || blob.size === 0) {
@@ -170,12 +232,13 @@ function GroupStageTeamsPanel({
   return (
     <aside
       data-export-expand
-      className="flex w-full min-h-0 shrink-0 flex-col border-b border-white/10 lg:h-auto lg:max-h-none lg:w-[17.5rem] lg:border-b-0 lg:border-r"
+      data-export-groups
+      className="flex w-full min-h-0 shrink-0 flex-col border-b border-white/10 landscape:h-full landscape:max-h-none landscape:w-[15rem] landscape:border-b-0 landscape:border-r lg:h-auto lg:w-[17.5rem] lg:border-b-0 lg:border-r"
     >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left lg:pointer-events-none"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left landscape:pointer-events-none lg:pointer-events-none"
       >
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">
@@ -185,15 +248,20 @@ function GroupStageTeamsPanel({
             {groups.length} bảng · xếp theo hạng
           </p>
         </div>
-        <span className="rounded-md border border-white/15 px-2 py-1 text-[11px] font-semibold text-slate-200 lg:hidden">
+        <span
+          data-export-hide
+          className="rounded-md border border-white/15 px-2 py-1 text-[11px] font-semibold text-slate-200 landscape:hidden lg:hidden"
+        >
           {open ? 'Ẩn' : 'Hiện'}
         </span>
       </button>
       <div
         data-export-expand
+        data-export-groups-list
         className={cn(
           'min-h-0 space-y-3 overflow-auto px-3 py-3',
           open ? 'max-h-[32vh]' : 'hidden',
+          'landscape:block landscape:max-h-none landscape:flex-1',
           'lg:block lg:max-h-none lg:flex-1',
         )}
       >
@@ -596,6 +664,7 @@ const ZOOM_STEP = 0.1
 
 function defaultZoom(): number {
   if (typeof window === 'undefined') return 1
+  if (window.matchMedia('(orientation: landscape)').matches) return 0.9
   return window.matchMedia('(max-width: 640px)').matches ? 0.72 : 1
 }
 
@@ -625,8 +694,14 @@ export function PlayoffBracketDiagramDialog({
     setZoom(defaultZoom())
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const syncZoom = () => setZoom(defaultZoom())
+    window.addEventListener('orientationchange', syncZoom)
+    const landscape = window.matchMedia('(orientation: landscape)')
+    landscape.addEventListener('change', syncZoom)
     return () => {
       document.body.style.overflow = previous
+      window.removeEventListener('orientationchange', syncZoom)
+      landscape.removeEventListener('change', syncZoom)
     }
   }, [open])
 
@@ -695,11 +770,11 @@ export function PlayoffBracketDiagramDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center overscroll-none sm:items-center sm:p-5">
-      <div className="absolute inset-0 bg-slate-950/90 sm:bg-slate-950/80" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center overscroll-none lg:items-center lg:p-5">
+      <div className="absolute inset-0 bg-slate-950/90 lg:bg-slate-950/80" onClick={onClose} />
       <div
         ref={exportRef}
-        className="relative flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#070b14] sm:h-auto sm:max-h-[min(94dvh,56rem)] sm:rounded-2xl sm:border sm:border-cyan-500/20 sm:shadow-2xl"
+        className="relative flex h-dvh w-full max-w-none flex-col overflow-hidden bg-[#070b14] lg:h-auto lg:max-h-[min(94dvh,56rem)] lg:max-w-6xl lg:rounded-2xl lg:border lg:border-cyan-500/20 lg:shadow-2xl"
       >
         <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:items-start sm:px-6 sm:py-3">
           <div className="min-w-0 flex-1">
@@ -735,10 +810,10 @@ export function PlayoffBracketDiagramDialog({
         </header>
 
         <div
-          className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-1.5 sm:hidden"
+          className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-1.5 landscape:hidden lg:hidden"
           data-export-hide
         >
-          <p className="text-[11px] text-slate-400">Vuốt ngang / dọc để xem hết nhánh</p>
+          <p className="text-[11px] text-slate-400">Vuốt để xem nhánh · xoay ngang vừa hơn</p>
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -764,7 +839,11 @@ export function PlayoffBracketDiagramDialog({
           </div>
         </div>
 
-        <div data-export-expand className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <div
+          data-export-expand
+          data-export-body
+          className="flex min-h-0 flex-1 flex-col landscape:flex-row lg:flex-row"
+        >
           <GroupStageTeamsPanel
             standingsGroups={standingsGroups}
             pairs={pairs}
@@ -774,6 +853,7 @@ export function PlayoffBracketDiagramDialog({
           />
           <div
             data-export-expand
+            data-export-tracks
             className="min-h-0 min-w-0 flex-1 space-y-8 overflow-auto overscroll-contain px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:space-y-10 sm:px-5 sm:py-4 [-webkit-overflow-scrolling:touch]"
           >
             {tracks.length === 0 ? (
@@ -821,13 +901,13 @@ export function PlayoffBracketDiagramDialog({
               </button>
             </div>
             <p className="shrink-0 px-3 pb-2 text-[11px] text-slate-400">
-              iPhone không tải file trực tiếp — bấm Lưu / Chia sẻ rồi chọn Lưu ảnh, hoặc nhấn giữ ảnh.
+              Ảnh xuất ngang cho rõ chữ. Xoay ngang máy để xem, hoặc bấm Lưu / Chia sẻ.
             </p>
             <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3">
               <img
                 src={imagePreview.url}
                 alt="Sơ đồ playoff"
-                className="mx-auto max-w-full select-auto rounded-lg"
+                className="mx-auto h-auto w-max max-w-none select-auto rounded-lg landscape:h-full landscape:w-auto landscape:max-h-full"
                 style={{ WebkitTouchCallout: 'default', WebkitUserSelect: 'auto' }}
               />
             </div>

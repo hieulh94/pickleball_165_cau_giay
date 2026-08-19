@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+@custom-variant landscape (@media (orientation: landscape));
 @custom-variant landscape-short (@media (max-height: 500px) and (orientation: landscape));
 
 /* ─── Light theme (default) ─── */
