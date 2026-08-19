@@ -139,6 +139,10 @@ function pushSeedMatch(
 /**
  * Vòng 1 hạng 1–2: xoay vòng theo bảng
  * A1–B2, B1–C2, C1–D2, D1–A2…
+ *
+ * Với ≥ 4 trận (4 bảng), xếp xen nửa trên/nửa dưới để bán kết là
+ * thắng(A1–B2) vs thắng(C1–D2) và thắng(B1–C2) vs thắng(D1–A2).
+ * Tránh B1 gặp B2 (cùng bảng) ngay ở bán kết.
  */
 function buildRankOneTwoCyclicPairings(groups: GroupStandings[]): ChampNode[] {
   const n = groups.length
@@ -146,12 +150,34 @@ function buildRankOneTwoCyclicPairings(groups: GroupStandings[]): ChampNode[] {
   for (let i = 0; i < n; i++) {
     pushSeedMatch(pairings, groups[i], 1, groups[(i + 1) % n], 2)
   }
-  return pairings
+  return interleaveOppositeMatchPairs(pairings)
+}
+
+/**
+ * Giữ nguyên từng trận (A1–B2, B1–C2…) nhưng đổi thứ tự trên nhánh:
+ * [M0, M1, M2, M3] → [M0, M2, M1, M3] (4 bảng: A1–B2 / C1–D2, B1–C2 / D1–A2).
+ */
+function interleaveOppositeMatchPairs(nodes: ChampNode[]): ChampNode[] {
+  if (nodes.length < 8 || nodes.length % 4 !== 0) return nodes
+  const matches: ChampNode[][] = []
+  for (let i = 0; i < nodes.length; i += 2) {
+    const left = nodes[i]
+    const right = nodes[i + 1]
+    if (!left || !right) return nodes
+    matches.push([left, right])
+  }
+  const half = matches.length / 2
+  const reordered: ChampNode[] = []
+  for (let i = 0; i < half; i++) {
+    reordered.push(...matches[i]!, ...matches[i + half]!)
+  }
+  return reordered
 }
 
 /**
  * Vòng 1 tranh giải:
  * a≥2 → xoay vòng A1–B2, B1–C2, C1–D2, D1–A2…
+ * (4 bảng: bán kết A1–B2 gặp C1–D2, B1–C2 gặp D1–A2)
  * a>2 → thêm cùng hạng (N=2: Ar–Br; N≥3: ghép cặp lần lượt).
  */
 function buildChampionshipFirstRoundSeeds(
@@ -197,7 +223,8 @@ function buildChampionshipFirstRoundSeeds(
 }
 
 /**
- * Bracket tranh giải: vòng 1 xoay vòng A1–B2, B1–C2…,
+ * Bracket tranh giải: vòng 1 xoay vòng A1–B2, B1–C2, C1–D2, D1–A2…,
+ * bán kết bắt chéo nửa bảng (thắng A1–B2 gặp thắng C1–D2),
  * rồi single-elim + tranh 3–4 (thua bán kết) + tranh 5–8 (thua tứ kết, khi đủ 8 đội).
  */
 function buildChampionshipMatches(
@@ -1084,7 +1111,9 @@ export function describePlayoffPreview(
   }
   if (groupCount >= 2 && a >= 2) {
     parts.push(
-      'Vòng 1 tranh giải: A1–B2, B1–C2, C1–D2, D1–A2… (xoay vòng theo bảng)',
+      groupCount >= 4
+        ? 'Vòng 1 tranh giải: A1–B2, B1–C2, C1–D2, D1–A2…; bán kết: thắng A1–B2 gặp thắng C1–D2 (tránh cùng bảng gặp sớm)'
+        : 'Vòng 1 tranh giải: A1–B2, B1–C2, C1–D2, D1–A2… (xoay vòng theo bảng)',
     )
   }
   if (champTeams >= 8) {

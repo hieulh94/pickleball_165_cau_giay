@@ -11,8 +11,49 @@ export interface RandomPairOptions {
   cannotPair?: (player1: Participant, player2: Participant) => boolean
 }
 
-const MAX_PAIR_ATTEMPTS = 300
+const MAX_PAIR_ATTEMPTS = 80
 const DEFAULT_RATING = 1000
+
+function withMemoizedPairOptions(options?: RandomPairOptions): RandomPairOptions | undefined {
+  if (!options) return options
+
+  const ratingCache = new Map<string, number>()
+  const genderCache = new Map<string, ClubPlayerGender>()
+  const cannotCache = new Map<string, boolean>()
+
+  return {
+    ...options,
+    getRating: options.getRating
+      ? (participant) => {
+          const hit = ratingCache.get(participant.id)
+          if (hit !== undefined) return hit
+          const value = options.getRating!(participant)
+          ratingCache.set(participant.id, value)
+          return value
+        }
+      : undefined,
+    getGender: options.getGender
+      ? (participant) => {
+          const hit = genderCache.get(participant.id)
+          if (hit !== undefined) return hit
+          const value = options.getGender!(participant)
+          genderCache.set(participant.id, value)
+          return value
+        }
+      : undefined,
+    cannotPair: options.cannotPair
+      ? (player1, player2) => {
+          const key =
+            player1.id < player2.id ? `${player1.id}:${player2.id}` : `${player2.id}:${player1.id}`
+          const hit = cannotCache.get(key)
+          if (hit !== undefined) return hit
+          const value = options.cannotPair!(player1, player2)
+          cannotCache.set(key, value)
+          return value
+        }
+      : undefined,
+  }
+}
 
 export function shuffleArray<T>(array: T[]): T[] {
   const result = [...array]
@@ -178,6 +219,7 @@ export function randomPairs(
   _groupCount?: number,
   options?: RandomPairOptions,
 ): { pairs: Pair[] } | { error: string } {
+  options = withMemoizedPairOptions(options)
   const levelB = participants.filter((p) => p.skillLevel === 'B')
   const levelA = participants.filter((p) => p.skillLevel === 'A')
 
@@ -227,7 +269,19 @@ function isFlatPairingValid(
   return true
 }
 
-/** Ghép bất kỳ (cho phép AA/BB): tối thiểu variance tổng Elo cặp. */
+function foldHighLow(sortedHighToLow: Participant[]): Participant[] {
+  const folded: Participant[] = []
+  let lo = 0
+  let hi = sortedHighToLow.length - 1
+  while (lo < hi) {
+    folded.push(sortedHighToLow[lo]!, sortedHighToLow[hi]!)
+    lo += 1
+    hi -= 1
+  }
+  return folded
+}
+
+/** Ghép bất kỳ (cho phép AA/BB): ưu tiên mạnh ↔ yếu, rồi thử ít lần nếu vướng rule. */
 function findBestEloBalancedPairs(
   participants: Participant[],
   options?: RandomPairOptions,
@@ -239,33 +293,27 @@ function findBestEloBalancedPairs(
   let bestVariance = Infinity
   let bestList: Participant[] | null = null
 
-  // Seed: mạnh nhất ↔ yếu nhất (thường cân Elo tốt)
+  const consider = (list: Participant[]) => {
+    if (!isFlatPairingValid(list, options)) return
+    const v = pairEloSumVariance(pairsFromFlatList(list), options)
+    if (v < bestVariance) {
+      bestVariance = v
+      bestList = list
+    }
+  }
+
+  // Seed: mạnh nhất ↔ yếu nhất (cân Elo tốt, O(n log n) — không random hàng trăm lần)
   const byRating = [...participants].sort(
     (a, b) => ratingOf(b, options) - ratingOf(a, options),
   )
-  const folded: Participant[] = []
-  let lo = 0
-  let hi = byRating.length - 1
-  while (lo < hi) {
-    folded.push(byRating[lo]!, byRating[hi]!)
-    lo += 1
-    hi -= 1
-  }
-  if (isFlatPairingValid(folded, options)) {
-    bestVariance = pairEloSumVariance(pairsFromFlatList(folded), options)
-    bestList = folded
-  }
+  consider(foldHighLow(byRating))
 
-  const n = participants.length / 2
-  const attempts = Math.min(800, n <= 4 ? 48 : 800)
+  const pairCount = participants.length / 2
+  const attempts = hasPairConstraints(options)
+    ? Math.min(MAX_PAIR_ATTEMPTS, 16 + pairCount * 4)
+    : Math.min(24, 8 + pairCount)
   for (let i = 0; i < attempts; i++) {
-    const shuffled = shuffleArray(participants)
-    if (!isFlatPairingValid(shuffled, options)) continue
-    const v = pairEloSumVariance(pairsFromFlatList(shuffled), options)
-    if (v < bestVariance) {
-      bestVariance = v
-      bestList = shuffled
-    }
+    consider(shuffleArray(participants))
   }
 
   if (!bestList) {
@@ -290,6 +338,8 @@ export function randomPairsBalancedElo(
   participants: Participant[],
   options?: RandomPairOptions,
 ): { pairs: Pair[] } | { error: string } {
+  options = withMemoizedPairOptions(options)
+
   if (participants.length < 2 || participants.length % 2 !== 0) {
     return { error: 'Số người phải là số chẵn để ghép cặp đôi.' }
   }
@@ -310,30 +360,38 @@ export function randomPairsBalancedElo(
   let bestA: Participant[] | null = null
   let bestB: Participant[] | null = null
 
-  const attempts = Math.min(500, n <= 4 ? 24 : 500)
-  for (let i = 0; i < attempts; i++) {
-    const shuffledA = shuffleArray(levelA)
-    const shuffledB = shuffleArray(levelB)
-    let valid = true
+  const consider = (listA: Participant[], listB: Participant[]) => {
     if (hasPairConstraints(options)) {
-      for (let j = 0; j < shuffledA.length; j++) {
-        if (!isValidPair(shuffledA[j]!, shuffledB[j]!, options)) {
-          valid = false
-          break
-        }
+      for (let j = 0; j < listA.length; j++) {
+        if (!isValidPair(listA[j]!, listB[j]!, options)) return
       }
     }
-    if (!valid) continue
-
-    const pairTuples = shuffledA.map(
-      (a, idx): [Participant, Participant] => [a, shuffledB[idx]!],
+    const pairTuples = listA.map(
+      (a, idx): [Participant, Participant] => [a, listB[idx]!],
     )
     const v = pairEloSumVariance(pairTuples, options)
     if (v < bestVariance) {
       bestVariance = v
-      bestA = shuffledA
-      bestB = shuffledB
+      bestA = listA
+      bestB = listB
     }
+  }
+
+  // B mạnh → yếu ghép A yếu → mạnh (cân tổng Elo). O(n log n), không treo khi thêm người.
+  const { orderedB, orderedA } = orderForBalancedCross(levelB, levelA, options)
+  consider(orderedA, orderedB)
+
+  if (hasPairConstraints(options)) {
+    for (let r = 1; r < n; r++) {
+      consider([...orderedA.slice(r), ...orderedA.slice(0, r)], orderedB)
+    }
+  }
+
+  const attempts = hasPairConstraints(options)
+    ? Math.min(MAX_PAIR_ATTEMPTS, 16 + n * 4)
+    : Math.min(24, 8 + n)
+  for (let i = 0; i < attempts; i++) {
+    consider(shuffleArray(levelA), shuffleArray(levelB))
   }
 
   if (!bestA || !bestB) {

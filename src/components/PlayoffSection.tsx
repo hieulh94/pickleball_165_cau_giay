@@ -10,6 +10,7 @@ import {
   type PairStandingInfo,
 } from '../lib/standings'
 import {
+  buildPlayoffMatches,
   canManuallyEditPlayoffPairs,
   canRegeneratePlayoff,
   calculateFinalRankings,
@@ -22,6 +23,7 @@ import {
   isFinalRankingComplete,
   isGroupStageComplete,
 } from '../lib/playoffBracket'
+import { PlayoffBracketDiagramDialog } from './PlayoffBracketDiagram'
 import type { Match, Pair, Participant, PlayoffConfig } from '../types'
 
 const PLAYOFF_NAME_PRESETS = ['Tứ kết', 'Bán kết', 'Chung kết']
@@ -361,6 +363,7 @@ export function PlayoffSection({
   const [pair1Id, setPair1Id] = useState('')
   const [pair2Id, setPair2Id] = useState('')
   const [showManual, setShowManual] = useState(false)
+  const [showDiagram, setShowDiagram] = useState(false)
 
   const groupCount = standingsGroups.filter((g) => g.group).length
   const pairsPerGroup =
@@ -402,6 +405,28 @@ export function PlayoffSection({
 
   const championshipMatches = autoMatches.filter((m) => m.playoffBracket === 'championship')
   const placementMatches = autoMatches.filter((m) => m.playoffBracket === 'placement')
+  const diagramMatches = useMemo(() => {
+    if (!splitGroups || groupCount < 2 || !groupComplete) return []
+    const auto = matches.filter(isAutoPlayoffMatch)
+    if (auto.length > 0) return auto
+    const config = playoffConfig ?? {
+      championshipSlotsPerGroup: slotsA,
+      placementSlotsPerGroup: slotsB,
+    }
+    return buildPlayoffMatches(standingsGroups, config, courts)
+  }, [
+    splitGroups,
+    groupCount,
+    groupComplete,
+    matches,
+    playoffConfig,
+    slotsA,
+    slotsB,
+    standingsGroups,
+    courts,
+  ])
+  const canShowDiagram = diagramMatches.length > 0
+  const diagramIsPreview = autoMatches.length === 0 && diagramMatches.length > 0
   const finalRankings = useMemo(() => calculateFinalRankings(matches), [matches])
   const finalRankingComplete = useMemo(() => isFinalRankingComplete(matches), [matches])
   const expectedPlaces = useMemo(() => expectedFinalPlaceCount(matches), [matches])
@@ -608,6 +633,24 @@ export function PlayoffSection({
               ? ' · Không tạo lại (đã có kết quả playoff)'
               : ''}
           </p>
+        </div>
+      )}
+
+      {canShowDiagram && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-200 bg-slate-900 px-4 py-3 text-white">
+          <div>
+            <p className="text-sm font-semibold">Sơ đồ playoff</p>
+            <p className="mt-0.5 text-xs text-slate-300">
+              {groupCount} bảng · xem luồng trận tiếp theo (thắng / thua)
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDiagram(true)}
+            className="rounded-lg bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-300"
+          >
+            Xem sơ đồ
+          </button>
         </div>
       )}
 
@@ -938,6 +981,17 @@ export function PlayoffSection({
           )}
         </div>
       )}
+
+      <PlayoffBracketDiagramDialog
+        open={showDiagram}
+        matches={diagramMatches}
+        pairs={pairs}
+        participants={participants}
+        pairNumberById={pairNumberById}
+        standingsGroups={standingsGroups}
+        isPreview={diagramIsPreview}
+        onClose={() => setShowDiagram(false)}
+      />
     </div>
   )
 }

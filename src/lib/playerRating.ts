@@ -93,7 +93,10 @@ function isTournamentEvent(event: PickleballEvent): boolean {
  * Identity Elo: ưu tiên club theo tên chuẩn (alias đã gộp), không tin clubPlayerId cũ
  * (VD vẫn gắn `vk-of-dương-gà` sau khi localStorage đã thành `chị-vân-anh`).
  */
-function resolvePlayerIdentity(participant: Participant): {
+function resolvePlayerIdentity(
+  participant: Participant,
+  players = getClubPlayers(),
+): {
   key: string
   canonicalName: string
   clubPlayerId?: string
@@ -102,11 +105,11 @@ function resolvePlayerIdentity(participant: Participant): {
 } {
   const canonicalName = resolveCanonicalPlayerName(participant.name)
   const club =
-    findClubPlayerByName(canonicalName) ??
+    findClubPlayerByName(canonicalName, players) ??
     (participant.clubPlayerId
-      ? findClubPlayerById(participant.clubPlayerId)
+      ? findClubPlayerById(participant.clubPlayerId, players)
       : undefined) ??
-    findClubPlayerByName(participant.name)
+    findClubPlayerByName(participant.name, players)
 
   const clubPlayerId = club?.id
   const key = clubPlayerId
@@ -409,10 +412,11 @@ export function recomputeClubRatingsFromEvents(events: PickleballEvent[]): {
 }
 
 export function getParticipantRating(participant: Participant): number {
-  const identity = resolvePlayerIdentity(participant)
+  const players = getClubPlayers()
+  const identity = resolvePlayerIdentity(participant, players)
   const club = identity.clubPlayerId
-    ? findClubPlayerById(identity.clubPlayerId)
-    : findClubPlayerByName(identity.canonicalName)
+    ? findClubPlayerById(identity.clubPlayerId, players)
+    : findClubPlayerByName(identity.canonicalName, players)
   return club?.rating ?? seedRatingFromSkillLevel(identity.skillLevel)
 }
 

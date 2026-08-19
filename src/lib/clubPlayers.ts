@@ -404,6 +404,21 @@ export function resolveCanonicalPlayerName(name: string): string {
   return name.trim()
 }
 
+let cachedPlayers: ClubPlayer[] | null = null
+let storageListenerBound = false
+
+function invalidateClubPlayersCache() {
+  cachedPlayers = null
+}
+
+function bindClubPlayersStorageListener() {
+  if (storageListenerBound || typeof window === 'undefined') return
+  storageListenerBound = true
+  window.addEventListener('storage', (event) => {
+    if (event.key === STORAGE_KEY) invalidateClubPlayersCache()
+  })
+}
+
 function notifyClubPlayersChanged() {
   window.dispatchEvent(new Event('club-players-changed'))
 }
@@ -430,6 +445,7 @@ function readStoredPlayers(): ClubPlayer[] | null {
 }
 
 function writeStoredPlayers(players: ClubPlayer[]) {
+  cachedPlayers = players
   localStorage.setItem(STORAGE_KEY, JSON.stringify(players))
   notifyClubPlayersChanged()
 }
@@ -452,6 +468,9 @@ export function buildClubPlayerId(name: string): string {
 
 /** Danh sách thành viên CLB (localStorage, seed từ CLUB_PLAYER_NAMES). */
 export function getClubPlayers(): ClubPlayer[] {
+  bindClubPlayersStorageListener()
+  if (cachedPlayers) return cachedPlayers
+
   const stored = readStoredPlayers()
   if (!stored) {
     const { players: seeded } = applyKnownNameMerges(buildSeedPlayers())
@@ -473,6 +492,8 @@ export function getClubPlayers(): ClubPlayer[] {
 
   if (needsFieldMigration || mergeChanged || femaleChanged || seedChanged) {
     writeStoredPlayers(withFemales)
+  } else {
+    cachedPlayers = withFemales
   }
   return withFemales
 }

@@ -13,6 +13,8 @@ const DEFAULT_SETTINGS: RandomPairSettings = {
   incompatibleWith: {},
 }
 
+let cachedSettings: RandomPairSettings | null = null
+
 function notifyChanged() {
   window.dispatchEvent(new Event(CHANGED_EVENT))
 }
@@ -29,25 +31,32 @@ function normalizeIncompatibleWith(raw: unknown): Record<string, string[]> {
 }
 
 function readSettings(): RandomPairSettings {
+  if (cachedSettings) return cachedSettings
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_SETTINGS }
+    if (!raw) {
+      cachedSettings = { ...DEFAULT_SETTINGS }
+      return cachedSettings
+    }
     const parsed = JSON.parse(raw) as Partial<RandomPairSettings> & {
       excludedClubPlayerIds?: string[]
     }
-    return {
+    cachedSettings = {
       avoidFemaleFemalePairs:
         typeof parsed.avoidFemaleFemalePairs === 'boolean'
           ? parsed.avoidFemaleFemalePairs
           : DEFAULT_SETTINGS.avoidFemaleFemalePairs,
       incompatibleWith: normalizeIncompatibleWith(parsed.incompatibleWith),
     }
+    return cachedSettings
   } catch {
-    return { ...DEFAULT_SETTINGS }
+    cachedSettings = { ...DEFAULT_SETTINGS }
+    return cachedSettings
   }
 }
 
 function writeSettings(settings: RandomPairSettings) {
+  cachedSettings = settings
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
   notifyChanged()
 }
