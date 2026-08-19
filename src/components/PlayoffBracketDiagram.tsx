@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { getPairLabel } from '../lib/pairing'
 import {
@@ -8,9 +8,9 @@ import {
   DIAGRAM_COL_GAP,
   DIAGRAM_PAD_X,
   formatGroupSeed,
+  buildTrackConnectors,
   layoutTrackPositions,
   layoutPlayoffTracks,
-  type PlayoffDiagramEdge,
   type PlayoffDiagramTrack,
 } from '../lib/playoffDiagram'
 import type { GroupStandings } from '../lib/standings'
@@ -25,11 +25,6 @@ interface PlayoffBracketDiagramDialogProps {
   standingsGroups?: GroupStandings[]
   isPreview?: boolean
   onClose: () => void
-}
-
-interface Connector {
-  path: string
-  kind: PlayoffDiagramEdge['kind']
 }
 
 function todayStamp(): string {
@@ -321,26 +316,6 @@ function GroupStageTeamsPanel({
   )
 }
 
-function roundedOrtho(x1: number, y1: number, x2: number, y2: number, busX: number): string {
-  const r = 10
-  const bus = Math.max(x1 + 16, Math.min(busX, x2 - 16))
-  if (Math.abs(y2 - y1) < 6) {
-    return `M ${x1} ${y1} H ${x2}`
-  }
-  const dir = y2 > y1 ? 1 : -1
-  if (Math.abs(y2 - y1) < r * 2) {
-    return `M ${x1} ${y1} H ${bus} V ${y2} H ${x2}`
-  }
-  return [
-    `M ${x1} ${y1}`,
-    `H ${bus - r}`,
-    `Q ${bus} ${y1} ${bus} ${y1 + dir * r}`,
-    `V ${y2 - dir * r}`,
-    `Q ${bus} ${y2} ${bus + r} ${y2}`,
-    `H ${x2}`,
-  ].join(' ')
-}
-
 function SlotRow({
   pair,
   pairNumber,
@@ -426,7 +401,7 @@ function DiagramMatchCard({
     <article
       data-diagram-match={match.id}
       className={cn(
-        'relative w-[252px] rounded-2xl border px-2.5 py-2 shadow-[0_0_24px_rgba(34,211,238,0.08)]',
+        'relative w-[252px] min-h-[128px] rounded-2xl border px-2.5 py-2 shadow-[0_0_24px_rgba(34,211,238,0.08)]',
         match.completed
           ? 'border-emerald-400/60 bg-slate-900/95'
           : 'border-cyan-400/40 bg-slate-900/95',
@@ -489,9 +464,11 @@ function TrackFlow({
   pairNumberById: Map<string, number>
   zoom: number
 }) {
-  const contentRef = useRef<HTMLDivElement>(null)
-  const [connectors, setConnectors] = useState<Connector[]>([])
   const layout = useMemo(() => layoutTrackPositions(track), [track])
+  const connectors = useMemo(
+    () => buildTrackConnectors(track, layout.positions),
+    [track, layout],
+  )
 
   const groupLabelByMatch = useMemo(() => {
     const map = new Map<string, string>()
@@ -503,72 +480,6 @@ function TrackFlow({
     }
     return map
   }, [track])
-
-  const redraw = () => {
-    const root = contentRef.current
-    if (!root) return
-    const rootRect = root.getBoundingClientRect()
-    const scale = zoom || 1
-
-    const pointOf = (el: Element | null) => {
-      if (!(el instanceof HTMLElement)) return null
-      const rect = el.getBoundingClientRect()
-      return {
-        x: (rect.left + rect.width / 2 - rootRect.left) / scale,
-        y: (rect.top + rect.height / 2 - rootRect.top) / scale,
-      }
-    }
-
-    const busByDest = new Map<string, { W: number; L: number }>()
-    for (const edge of track.edges) {
-      const fromEl = root.querySelector(`[data-diagram-match="${edge.fromId}"]`)
-      if (!(fromEl instanceof HTMLElement)) continue
-      const fromRect = fromEl.getBoundingClientRect()
-      const fromRight = (fromRect.right - rootRect.left) / scale
-      const current = busByDest.get(edge.toId) ?? { W: fromRight + 22, L: fromRight + 46 }
-      if (edge.kind === 'W') current.W = Math.min(current.W, fromRight + 22)
-      else current.L = Math.min(current.L, fromRight + 48)
-      busByDest.set(edge.toId, current)
-    }
-
-    const next: Connector[] = []
-    for (const edge of track.edges) {
-      const fromSlot = root.querySelector(
-        `[data-diagram-match="${edge.fromId}"] [data-out="${edge.kind}"]`,
-      )
-      const fromPort =
-        fromSlot ??
-        root.querySelector(`[data-diagram-match="${edge.fromId}"] [data-port="${edge.kind}"]`)
-      const toPort = root.querySelector(
-        `[data-diagram-match="${edge.toId}"] [data-port="in-${edge.toSlot ?? 1}"]`,
-      )
-      const from = pointOf(fromPort)
-      const to = pointOf(toPort)
-      if (!from || !to) continue
-      const bus = busByDest.get(edge.toId)
-      const busX = edge.kind === 'W' ? (bus?.W ?? from.x + 22) : (bus?.L ?? from.x + 48)
-      next.push({
-        kind: edge.kind,
-        path: roundedOrtho(from.x, from.y, to.x, to.y, busX),
-      })
-    }
-    setConnectors(next)
-  }
-
-  useLayoutEffect(() => {
-    redraw()
-    const frame = window.requestAnimationFrame(() => redraw())
-    const root = contentRef.current
-    if (!root) return () => window.cancelAnimationFrame(frame)
-    const observer = new ResizeObserver(() => redraw())
-    observer.observe(root)
-    window.addEventListener('resize', redraw)
-    return () => {
-      window.cancelAnimationFrame(frame)
-      observer.disconnect()
-      window.removeEventListener('resize', redraw)
-    }
-  }, [track, layout, zoom])
 
   const canvasHeight = layout.height + 28
 
@@ -582,13 +493,12 @@ function TrackFlow({
       <div
         data-export-expand
         data-diagram-zoom-frame
-        className="relative"
+        className="relative overflow-hidden"
         style={{ width: layout.width * zoom, height: canvasHeight * zoom }}
       >
         <div
-          ref={contentRef}
           data-diagram-zoom
-          className="absolute left-0 top-0 origin-top-left"
+          className="relative origin-top-left"
           style={{
             width: layout.width,
             height: canvasHeight,
@@ -616,7 +526,7 @@ function TrackFlow({
           <svg
             className="pointer-events-none absolute inset-0 z-0"
             width={layout.width}
-            height={layout.height + 28}
+            height={canvasHeight}
             aria-hidden
           >
             {connectors.map((connector, index) => (
