@@ -637,17 +637,17 @@ export function PlayoffSection({
       )}
 
       {canShowDiagram && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-200 bg-slate-900 px-4 py-3 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
           <div>
             <p className="text-sm font-semibold">Sơ đồ playoff</p>
-            <p className="mt-0.5 text-xs text-slate-300">
+            <p className="mt-0.5 text-xs text-emerald-800/80">
               {groupCount} bảng · xem luồng trận tiếp theo (thắng / thua)
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowDiagram(true)}
-            className="w-full rounded-lg bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-300 sm:w-auto"
+            className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 sm:w-auto"
           >
             Xem sơ đồ
           </button>

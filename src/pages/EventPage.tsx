@@ -14,6 +14,7 @@ import {
 } from '../components/PlayerPickerDialog'
 import { SkillLevelBadge } from '../components/SkillLevelBadge'
 import { PairGroupSelect } from '../components/PairGroupSelect'
+import { GroupScheduleDiagramDialog } from '../components/GroupScheduleDiagram'
 import { PairScheduleDialog } from '../components/PairScheduleDialog'
 import {
   QuickGroupResultsDialog,
@@ -202,6 +203,7 @@ export function EventPage() {
     pairId: string
     pairNumber: number
   } | null>(null)
+  const [showGroupScheduleDiagram, setShowGroupScheduleDiagram] = useState(false)
   const [showGroupCountDialog, setShowGroupCountDialog] = useState(false)
   const [showEnableSplitGroupsConfirm, setShowEnableSplitGroupsConfirm] = useState(false)
   const [showRandomizeGroupsConfirm, setShowRandomizeGroupsConfirm] = useState(false)
@@ -2193,7 +2195,24 @@ export function EventPage() {
 
         {groupMatches.length > 0 && (
           <>
-            <div className="mt-6 flex flex-wrap gap-2">
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
+              <div>
+                <p className="text-sm font-semibold">Lịch thi đấu vòng bảng</p>
+                <p className="mt-0.5 text-xs text-emerald-800/80">
+                  {matchesByRound.length} vòng · {groupMatches.length} trận
+                  {event.splitGroups ? ' · theo bảng' : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGroupScheduleDiagram(true)}
+                className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 sm:w-auto"
+              >
+                Xem lịch
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -2467,6 +2486,17 @@ export function EventPage() {
         pairLabel={pairScheduleLabel}
         entries={pairScheduleEntries}
         onClose={() => setPairScheduleTarget(null)}
+      />
+
+      <GroupScheduleDiagramDialog
+        open={showGroupScheduleDiagram}
+        eventName={event.name}
+        matches={groupMatches}
+        pairs={event.pairs}
+        participants={event.participants}
+        pairNumberById={pairNumberById}
+        splitGroups={event.splitGroups}
+        onClose={() => setShowGroupScheduleDiagram(false)}
       />
 
       <QuickGroupResultsDialog

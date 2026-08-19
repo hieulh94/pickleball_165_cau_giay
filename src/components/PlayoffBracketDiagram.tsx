@@ -87,7 +87,7 @@ function prepareExportLayout(root: HTMLElement): () => void {
     maxWidth: '280px',
     height: 'auto',
     borderBottom: 'none',
-    borderRight: '1px solid rgba(255,255,255,0.12)',
+    borderRight: '1px solid rgb(229, 231, 235)',
   })
 
   const groupsList = root.querySelector<HTMLElement>('[data-export-groups-list]')
@@ -169,7 +169,7 @@ async function captureDiagramPng(node: HTMLElement): Promise<Blob> {
       scale,
       width,
       height,
-      backgroundColor: '#070b14',
+      backgroundColor: '#f8fafc',
       font: false,
       maximumCanvasSize: maxCanvas,
       style: {
@@ -248,7 +248,7 @@ function GroupStageTeamsPanel({
     <aside
       data-export-expand
       data-export-groups
-      className="flex w-full min-h-0 shrink-0 flex-col border-b border-white/10 landscape:h-full landscape:max-h-none landscape:w-[15rem] landscape:border-b-0 landscape:border-r lg:h-auto lg:w-[17.5rem] lg:border-b-0 lg:border-r"
+      className="flex w-full min-h-0 shrink-0 flex-col border-b border-neutral-200 bg-white landscape:h-full landscape:max-h-none landscape:w-[15rem] landscape:border-b-0 landscape:border-r lg:h-auto lg:w-[17.5rem] lg:border-b-0 lg:border-r"
     >
       <button
         type="button"
@@ -256,16 +256,16 @@ function GroupStageTeamsPanel({
         className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left landscape:pointer-events-none lg:pointer-events-none"
       >
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
             Vòng bảng
           </p>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-0.5 text-[11px] text-neutral-500">
             {groups.length} bảng · xếp theo hạng
           </p>
         </div>
         <span
           data-export-hide
-          className="rounded-md border border-white/15 px-2 py-1 text-[11px] font-semibold text-slate-200 landscape:hidden lg:hidden"
+          className="rounded-md border border-neutral-300 px-2 py-1 text-[11px] font-semibold text-neutral-700 landscape:hidden lg:hidden"
         >
           {open ? 'Ẩn' : 'Hiện'}
         </span>
@@ -282,7 +282,7 @@ function GroupStageTeamsPanel({
       >
         {groups.map((group) => (
           <section key={group.group}>
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-200/90">
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">
               {group.group}
             </p>
             <ul className="space-y-1">
@@ -297,28 +297,28 @@ function GroupStageTeamsPanel({
                     className={cn(
                       'rounded-lg border px-2 py-1.5',
                       appearance?.bracket === 'championship'
-                        ? 'border-emerald-400/40 bg-emerald-500/10'
+                        ? 'border-emerald-200 bg-emerald-50'
                         : appearance?.bracket === 'placement'
-                          ? 'border-amber-400/40 bg-amber-500/10'
-                          : 'border-white/10 bg-white/5 opacity-60',
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-neutral-200 bg-neutral-50 opacity-60',
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-200/80">
+                        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                           {seed}
                           {number > 0 ? ` · Cặp ${number}` : ''}
                           {` · ${row.wins}T-${row.losses}B`}
                         </p>
-                        <p className="truncate text-xs font-semibold text-white">
+                        <p className="truncate text-xs font-semibold text-neutral-900">
                           {pairNames(pair, participants) || '—'}
                         </p>
                       </div>
-                      <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-300">
+                      <span className="shrink-0 text-[10px] font-bold tabular-nums text-neutral-500">
                         #{row.rank}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-[10px] text-slate-400">
+                    <p className="mt-0.5 truncate text-[10px] text-neutral-500">
                       {appearance
                         ? appearance.bracket === 'placement'
                           ? `Tranh hạng · ${appearance.matchName}`
@@ -367,17 +367,21 @@ function SlotRow({
       data-port={port}
       data-out={outPort}
       className={cn(
-        'relative flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5',
-        won ? 'bg-emerald-400/20' : lost ? 'bg-black/25 opacity-70' : 'bg-white/5',
+        'relative flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5',
+        won
+          ? 'border-emerald-200 bg-emerald-100'
+          : lost
+            ? 'border-neutral-200 bg-neutral-100 opacity-70'
+            : 'border-neutral-200 bg-white',
       )}
     >
       <div className="min-w-0">
-        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-200/80">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
           {pair
             ? `Cặp ${pairNumber || '—'}${seed ? ` · ${seed}` : ''}`
             : 'Chờ đội'}
         </p>
-        <p className="truncate text-[13px] font-semibold text-white">
+        <p className="truncate text-[13px] font-semibold text-neutral-900">
           {pair ? label || waitingLabel : waitingLabel}
         </p>
       </div>
@@ -385,7 +389,7 @@ function SlotRow({
         <span
           className={cn(
             'tabular-nums text-base font-bold',
-            won ? 'text-emerald-300' : 'text-white/70',
+            won ? 'text-emerald-700' : 'text-neutral-500',
           )}
         >
           {score}
@@ -421,21 +425,21 @@ function DiagramMatchCard({
     <article
       data-diagram-match={match.id}
       className={cn(
-        'relative w-[252px] min-h-[148px] rounded-2xl border px-2.5 py-2 shadow-[0_0_24px_rgba(34,211,238,0.08)]',
+        'relative w-[252px] min-h-[148px] rounded-2xl border px-2.5 py-2 shadow-sm',
         match.completed
-          ? 'border-emerald-400/60 bg-slate-900/95'
-          : 'border-cyan-400/40 bg-slate-900/95',
+          ? 'border-emerald-200 bg-emerald-50'
+          : 'border-neutral-200 bg-white',
       )}
     >
       <span data-port="W" className="pointer-events-none absolute right-0 top-[32%] h-px w-px" />
       <span data-port="L" className="pointer-events-none absolute right-0 top-[72%] h-px w-px" />
       {stageLabel && (
-        <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200">
+        <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">
           {stageLabel}
         </p>
       )}
       {!stageLabel && (
-        <p className="mb-1.5 truncate text-[10px] font-bold uppercase tracking-wider text-cyan-200">
+        <p className="mb-1.5 truncate text-[10px] font-bold uppercase tracking-wider text-emerald-700">
           {match.name || 'Playoff'}
         </p>
       )}
@@ -506,8 +510,8 @@ function TrackFlow({
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-3 px-1">
-        <h4 className="text-sm font-semibold tracking-wide text-cyan-100">{track.title}</h4>
-        <p className="text-[11px] text-slate-400">{track.matchIds.length} trận</p>
+        <h4 className="text-sm font-semibold tracking-wide text-emerald-800">{track.title}</h4>
+        <p className="text-[11px] text-neutral-500">{track.matchIds.length} trận</p>
       </div>
 
       <div
@@ -519,7 +523,7 @@ function TrackFlow({
           column.label ? (
             <p
               key={`${track.id}-h-${index}`}
-              className="pointer-events-none absolute z-20 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-300"
+              className="pointer-events-none absolute z-20 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700"
               style={{
                 left: (DIAGRAM_PAD_X + index * (DIAGRAM_CARD_WIDTH + DIAGRAM_COL_GAP)) * zoom,
                 width: DIAGRAM_CARD_WIDTH * zoom,
@@ -544,10 +548,10 @@ function TrackFlow({
               key={`${connector.kind}-${index}`}
               d={connector.path}
               fill="none"
-              stroke={connector.kind === 'W' ? '#34d399' : '#fbbf24'}
+              stroke={connector.kind === 'W' ? '#059669' : '#d97706'}
               strokeWidth="2.25"
               strokeLinecap="round"
-              strokeOpacity={connector.kind === 'W' ? 0.95 : 0.85}
+              strokeOpacity={connector.kind === 'W' ? 0.95 : 0.9}
             />
           ))}
         </svg>
@@ -711,21 +715,21 @@ export function PlayoffBracketDiagramDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center overscroll-none lg:items-center lg:p-5">
-      <div className="absolute inset-0 bg-slate-950/90 lg:bg-slate-950/80" onClick={onClose} />
+      <div className="absolute inset-0 bg-neutral-900/40 lg:bg-neutral-900/30" onClick={onClose} />
       <div
         ref={exportRef}
-        className="relative flex h-dvh w-full max-w-none flex-col overflow-hidden bg-[#070b14] lg:h-auto lg:max-h-[min(94dvh,56rem)] lg:max-w-6xl lg:rounded-2xl lg:border lg:border-cyan-500/20 lg:shadow-2xl"
+        className="relative flex h-dvh w-full max-w-none flex-col overflow-hidden bg-slate-50 lg:h-auto lg:max-h-[min(94dvh,56rem)] lg:max-w-6xl lg:rounded-2xl lg:border lg:border-neutral-200 lg:shadow-2xl"
       >
-        <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:items-start sm:px-6 sm:py-3">
+        <header className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:items-start sm:px-6 sm:py-3">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold text-white sm:text-lg">
+            <h3 className="truncate text-base font-semibold text-neutral-900 sm:text-lg">
               Sơ đồ playoff
             </h3>
-            <p className="mt-0.5 hidden text-xs text-slate-400 sm:block">
+            <p className="mt-0.5 hidden text-xs text-neutral-500 sm:block">
               Thắng đi tiếp (xanh) · thua sang nhánh phụ (vàng) — trận sau nằm giữa hai trận nuôi
             </p>
             {isPreview && (
-              <p className="mt-1 text-[11px] text-amber-300 sm:text-xs">
+              <p className="mt-1 text-[11px] text-amber-700 sm:text-xs">
                 Sơ đồ dự kiến từ BXH — tạo bracket để lưu trận và nhập kết quả.
               </p>
             )}
@@ -735,14 +739,14 @@ export function PlayoffBracketDiagramDialog({
               type="button"
               onClick={() => void handleDownloadImage()}
               disabled={downloading || tracks.length === 0}
-              className="min-h-10 rounded-lg bg-cyan-400 px-2.5 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-sm"
+              className="min-h-10 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-sm"
             >
               {downloading ? 'Đang tải…' : 'Tải ảnh'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="min-h-10 rounded-lg border border-white/15 px-2.5 py-2 text-xs font-medium text-slate-200 hover:bg-white/10 sm:px-3 sm:text-sm"
+              className="min-h-10 rounded-lg border border-neutral-300 px-2.5 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 sm:px-3 sm:text-sm"
             >
               Đóng
             </button>
@@ -750,21 +754,21 @@ export function PlayoffBracketDiagramDialog({
         </header>
 
         <div
-          className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-1.5 landscape:hidden lg:hidden"
+          className="flex shrink-0 items-center justify-between gap-2 border-b border-neutral-200 bg-white px-3 py-1.5 landscape:hidden lg:hidden"
           data-export-hide
         >
-          <p className="text-[11px] text-slate-400">Vuốt để xem nhánh · xoay ngang vừa hơn</p>
+          <p className="text-[11px] text-neutral-500">Vuốt để xem nhánh · xoay ngang vừa hơn</p>
           <div className="flex items-center gap-1">
             <button
               type="button"
               aria-label="Thu nhỏ"
               onClick={() => bumpZoom(-ZOOM_STEP)}
               disabled={zoom <= MIN_ZOOM}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 text-sm font-bold text-white disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-300 text-sm font-bold text-neutral-800 disabled:opacity-40"
             >
               −
             </button>
-            <span className="w-10 text-center text-[11px] tabular-nums text-slate-300">
+            <span className="w-10 text-center text-[11px] tabular-nums text-neutral-600">
               {Math.round(zoom * 100)}%
             </span>
             <button
@@ -772,7 +776,7 @@ export function PlayoffBracketDiagramDialog({
               aria-label="Phóng to"
               onClick={() => bumpZoom(ZOOM_STEP)}
               disabled={zoom >= MAX_ZOOM}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 text-sm font-bold text-white disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-neutral-300 text-sm font-bold text-neutral-800 disabled:opacity-40"
             >
               +
             </button>
@@ -797,7 +801,7 @@ export function PlayoffBracketDiagramDialog({
             className="min-h-0 min-w-0 flex-1 space-y-8 overflow-auto overscroll-contain px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:space-y-10 sm:px-5 sm:py-4 [-webkit-overflow-scrolling:touch]"
           >
             {tracks.length === 0 ? (
-              <p className="py-10 text-center text-sm text-slate-400">
+              <p className="py-10 text-center text-sm text-neutral-500">
                 Chưa có trận playoff để vẽ sơ đồ.
               </p>
             ) : (
@@ -818,29 +822,29 @@ export function PlayoffBracketDiagramDialog({
 
         {imagePreview && (
           <div
-            className="absolute inset-0 z-20 flex flex-col bg-[#070b14] pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            className="absolute inset-0 z-20 flex flex-col bg-slate-50 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
             data-export-hide
           >
             <div className="flex shrink-0 items-center gap-2 px-3 py-2">
-              <p className="min-w-0 flex-1 text-sm font-semibold text-white">
+              <p className="min-w-0 flex-1 text-sm font-semibold text-neutral-900">
                 Nhấn giữ ảnh để lưu
               </p>
               <button
                 type="button"
                 onClick={() => void handleSharePreview()}
-                className="min-h-10 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950"
+                className="min-h-10 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
               >
                 Lưu / Chia sẻ
               </button>
               <button
                 type="button"
                 onClick={closeImagePreview}
-                className="min-h-10 rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-slate-200"
+                className="min-h-10 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-medium text-neutral-700"
               >
                 Đóng
               </button>
             </div>
-            <p className="shrink-0 px-3 pb-2 text-[11px] text-slate-400">
+            <p className="shrink-0 px-3 pb-2 text-[11px] text-neutral-500">
               Ảnh xuất ngang cho rõ chữ. Xoay ngang máy để xem, hoặc bấm Lưu / Chia sẻ.
             </p>
             <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3">
